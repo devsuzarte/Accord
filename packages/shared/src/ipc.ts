@@ -11,12 +11,14 @@ export const IpcChannel = {
   OverlayGetState: 'overlay:get-state',
   OverlaySetGhost: 'overlay:set-ghost',
   OverlayMoveTo: 'overlay:move-to',
+  OverlayDrag: 'overlay:drag',
   /** main → renderers: estado do overlay mudou. */
   OverlayStateChanged: 'overlay:state-changed',
 
   PanelToggle: 'panel:toggle',
   PanelClose: 'panel:close',
   PanelResize: 'panel:resize',
+  PanelHold: 'panel:hold',
   /** main → painel: qual aba abrir. */
   PanelOpenTab: 'panel:open-tab',
 

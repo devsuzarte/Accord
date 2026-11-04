@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLanguage, useT } from '../shared/i18n'
 import { IMAGE_ACCEPT } from '../shared/images'
 import { AvatarCropper } from './AvatarCropper'
+import { openFilePicker } from '../shared/filePicker'
 
 const accepted = IMAGE_ACCEPT.split(',')
 
@@ -66,7 +67,7 @@ export function ProfileTab({ profile, inCall }: { profile: Profile; inCall: bool
           type="button"
           className="profile__photo"
           title={t('profile.changePhoto')}
-          onClick={() => fileRef.current?.click()}
+          onClick={() => openFilePicker(fileRef.current)}
         >
           <Avatar id="local" name={profile.name || name} src={profile.avatar} size={72} />
           <span className="profile__photo-edit" aria-hidden>
@@ -77,7 +78,7 @@ export function ProfileTab({ profile, inCall }: { profile: Profile; inCall: bool
           <button
             type="button"
             className="action action--small"
-            onClick={() => fileRef.current?.click()}
+            onClick={() => openFilePicker(fileRef.current)}
           >
             {profile.avatar ? t('profile.changePhoto') : t('profile.choosePhoto')}
           </button>

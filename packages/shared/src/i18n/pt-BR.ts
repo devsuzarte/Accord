@@ -298,7 +298,9 @@ export const ptBR = {
   'picker.audioScreen': 'Todo o som do computador, menos as vozes da chamada.',
   'picker.audioApp': 'Só o som deste aplicativo.',
   'picker.start': 'Transmitir',
-  'preset.detail': 'Texto nítido',
+  'preset.smooth': 'Leve e fluido',
+  'preset.smoothTitle':
+    '60 fps com metade da internet do 1080p. Bom para jogos quando a conexão é mediana.',
   'preset.balanced': 'Equilibrado',
   'preset.motion': 'Jogos e vídeo',
   'preset.fluid': 'Fluido',

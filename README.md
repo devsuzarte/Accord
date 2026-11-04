@@ -51,7 +51,7 @@ bun run package            # gera as duas coisas abaixo (rode no Windows)
 | Saída | O que é |
 |---|---|
 | `release/accord-server/` | **Servidor**: `accord-server.exe` + `livekit-server.exe` + `LEIA-ME.txt`. Um duplo clique sobe tudo, com chaves próprias geradas na primeira vez, e a janela mostra os IPs para os amigos usarem |
-| `release/app/Accord-Setup-0.1.0.exe` | **App**: instalador NSIS do Windows |
+| `release/app/Accord-Setup-<versão>.exe` | **App**: instalador NSIS do Windows |
 
 Portas para liberar no firewall de quem hospeda: **7870/TCP** (servidor), **7871/UDP** (para o app achar o servidor na rede), **7880–7881/TCP** e **7882/UDP** (voz e vídeo). O instalador do app já leva o servidor junto (botão Hospedar).
 

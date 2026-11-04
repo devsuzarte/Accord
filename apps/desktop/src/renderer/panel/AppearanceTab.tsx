@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { IMAGE_ACCEPT, prepareImage } from '../shared/images'
 import { useT } from '../shared/i18n'
 import { applyTheme } from '../shared/theme'
+import { openFilePicker } from '../shared/filePicker'
 
 /**
  * Aba Aparência: paletas prontas, as 8 cores do app e uma imagem de fundo (aceita GIF)
@@ -116,7 +117,7 @@ export function AppearanceTab() {
                 ? `url("${theme.backgroundImage}")`
                 : undefined,
             }}
-            onClick={() => fileRef.current?.click()}
+            onClick={() => openFilePicker(fileRef.current)}
             aria-label={theme.backgroundImage ? t('look.bgChangeLabel') : t('look.bgChooseLabel')}
           >
             {!theme.backgroundImage && <ImagePlus size={20} aria-hidden />}
@@ -125,7 +126,7 @@ export function AppearanceTab() {
             <button
               type="button"
               className="action action--small"
-              onClick={() => fileRef.current?.click()}
+              onClick={() => openFilePicker(fileRef.current)}
             >
               {theme.backgroundImage ? t('look.bgChange') : t('look.bgChoose')}
             </button>

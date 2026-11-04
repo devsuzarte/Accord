@@ -87,7 +87,7 @@ const idleCall: CallSnapshot = {
   error: null,
 }
 
-const presets = ['detail', 'balanced', 'motion', 'fluid']
+const presets = ['balanced', 'smooth', 'motion', 'fluid']
 
 function isShareRequest(value: unknown): value is ShareRequest {
   const v = value as ShareRequest
@@ -167,6 +167,11 @@ export function registerIpcHandlers({
   ipcMain.on(IpcChannel.OverlaySetGhost, (_event, ghost: unknown) => {
     if (typeof ghost === 'boolean') overlay.setGhost(ghost)
   })
+  ipcMain.on(IpcChannel.OverlayDrag, (event, phase: unknown) => {
+    if (fromPill(event) && (phase === 'start' || phase === 'move' || phase === 'end')) {
+      overlay.drag(phase)
+    }
+  })
   ipcMain.on(IpcChannel.OverlayMoveTo, (_event, corner: unknown) => {
     if (corners.includes(corner as OverlayCorner)) overlay.moveTo(corner as OverlayCorner)
   })
@@ -175,6 +180,9 @@ export function registerIpcHandlers({
     overlay.togglePanel(tabs.includes(tab as PanelTab) ? (tab as PanelTab) : undefined)
   })
   ipcMain.on(IpcChannel.PanelClose, () => overlay.hidePanel())
+  ipcMain.on(IpcChannel.PanelHold, (event, hold: unknown) => {
+    if (fromPanel(event) && typeof hold === 'boolean') overlay.holdPanel(hold)
+  })
   ipcMain.on(IpcChannel.PanelResize, (event, size: unknown) => {
     if (fromPanel(event) && isSize(size)) overlay.resizePanel(size)
   })

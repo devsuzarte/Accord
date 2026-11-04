@@ -4,8 +4,8 @@ import { useT } from '../shared/i18n'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 const presetOptions: Array<{ id: StreamQualityPreset; detail: string; title?: MessageKey }> = [
-  { id: 'detail', detail: '1080p, 15 fps' },
   { id: 'balanced', detail: '720p, 30 fps' },
+  { id: 'smooth', detail: '720p, 60 fps', title: 'preset.smoothTitle' },
   { id: 'motion', detail: '1080p, 30 fps' },
   { id: 'fluid', detail: '1080p, 60 fps', title: 'preset.fluidTitle' },
 ]
@@ -16,7 +16,8 @@ const AUDIO_KEY = 'sharescreen.share.audio'
 function readPreset(): StreamQualityPreset {
   try {
     const value = localStorage.getItem(PRESET_KEY)
-    if (value === 'detail' || value === 'balanced' || value === 'motion' || value === 'fluid') {
+    // Versões antigas tinham 'detail' (1080p a 15 fps): cai no padrão.
+    if (value === 'balanced' || value === 'smooth' || value === 'motion' || value === 'fluid') {
       return value
     }
   } catch {

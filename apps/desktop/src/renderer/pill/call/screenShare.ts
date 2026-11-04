@@ -11,19 +11,20 @@ const presets: Record<
   StreamQualityPreset,
   { width: number; height: number; fps: number; hint: string; encoding: VideoPreset }
 > = {
-  detail: {
-    width: 1920,
-    height: 1080,
-    fps: 15,
-    hint: 'detail',
-    encoding: ScreenSharePresets.h1080fps15,
-  },
   balanced: {
     width: 1280,
     height: 720,
     fps: 30,
     hint: 'motion',
     encoding: ScreenSharePresets.h720fps30,
+  },
+  /** 60 fps gastando metade da banda do 1080p60 (~4 Mbps): bom para conexões medianas. */
+  smooth: {
+    width: 1280,
+    height: 720,
+    fps: 60,
+    hint: 'motion',
+    encoding: new VideoPreset(1280, 720, 4_000_000, 60, 'high'),
   },
   motion: {
     width: 1920,

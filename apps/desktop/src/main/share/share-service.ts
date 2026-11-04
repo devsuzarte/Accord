@@ -1,5 +1,6 @@
 import { tm } from '../i18n'
 import {
+  app,
   BrowserWindow,
   desktopCapturer,
   MessageChannelMain,
@@ -166,6 +167,15 @@ export class ShareService {
     try {
       this.audio.start(kind, sourceId, (chunk) => port1.postMessage(chunk))
       console.info(`[share] som nativo ligado (${kind})`)
+      if (kind === 'screen') {
+        // Diagnóstico do "eco": o som do próprio app sai pelo serviço de áudio, filho deste processo.
+        const audioService = app
+          .getAppMetrics()
+          .find((m) => m.type === 'Utility' && /audio/i.test(m.serviceName ?? ''))
+        console.info(
+          `[share] tela inteira sem o som do app: exclui a árvore do pid ${process.pid} (serviço de áudio: pid ${audioService?.pid ?? '?'})`,
+        )
+      }
     } catch (error) {
       console.warn('[share] som nativo indisponível', error)
       port1.close()

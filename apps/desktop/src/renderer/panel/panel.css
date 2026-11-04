@@ -1302,3 +1302,9 @@ kbd[data-broken] {
 .cropper__actions .action {
   flex: 1;
 }
+
+/* O campo de endereço ocupa toda a largura que sobra ao lado do botão. */
+.add-address .field__input {
+  flex: 1;
+  min-width: 0;
+}

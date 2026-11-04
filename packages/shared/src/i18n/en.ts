@@ -296,7 +296,9 @@ export const en: Messages = {
   'picker.audioScreen': "All of the computer's sound, except the call voices.",
   'picker.audioApp': "Only this app's sound.",
   'picker.start': 'Go live',
-  'preset.detail': 'Sharp text',
+  'preset.smooth': 'Light & smooth',
+  'preset.smoothTitle':
+    '60 fps using half the bandwidth of 1080p. Good for games on average connections.',
   'preset.balanced': 'Balanced',
   'preset.motion': 'Games and video',
   'preset.fluid': 'Smooth',

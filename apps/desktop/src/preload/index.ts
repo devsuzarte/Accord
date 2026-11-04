@@ -36,12 +36,14 @@ const platform: PlatformBridge = {
     getState: () => ipcRenderer.invoke(IpcChannel.OverlayGetState),
     setGhost: (ghost) => ipcRenderer.send(IpcChannel.OverlaySetGhost, ghost),
     moveTo: (corner) => ipcRenderer.send(IpcChannel.OverlayMoveTo, corner),
+    drag: (phase) => ipcRenderer.send(IpcChannel.OverlayDrag, phase),
     onStateChange: (listener) => subscribe<OverlayState>(IpcChannel.OverlayStateChanged, listener),
   },
   panel: {
     toggle: (tab) => ipcRenderer.send(IpcChannel.PanelToggle, tab),
     close: () => ipcRenderer.send(IpcChannel.PanelClose),
     resize: (size) => ipcRenderer.send(IpcChannel.PanelResize, size),
+    hold: (hold) => ipcRenderer.send(IpcChannel.PanelHold, hold),
     onOpenTab: (listener) => subscribe<PanelTab>(IpcChannel.PanelOpenTab, listener),
   },
   hotkeys: {

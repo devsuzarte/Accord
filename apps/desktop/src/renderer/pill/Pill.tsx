@@ -22,6 +22,7 @@ import { demoEnabled, demoParticipants } from '../shared/demo'
 import { t as translateNow, useT } from '../shared/i18n'
 import { useOverlayState } from '../shared/useOverlayState'
 import { useCallStore } from './call/callStore'
+import { useSpineDrag } from './useSpineDrag'
 
 type Mode = 'collapsed' | 'compact'
 
@@ -127,6 +128,7 @@ function useRealCall(): CallView {
 const useCall = demoEnabled ? useDemoCall : useRealCall
 
 export function Pill() {
+  const spineDrag = useSpineDrag()
   const t = useT()
   const overlay = useOverlayState()
   const call = useCall()
@@ -170,7 +172,7 @@ export function Pill() {
         data-mode={mode}
         data-ghost={overlay.ghost || undefined}
       >
-        <div className="spine" title={t('pill.dragToMove')}>
+        <div className="spine" title={t('pill.dragToMove')} {...spineDrag}>
           <span className="spine__grip" aria-hidden>
             {Array.from({ length: 6 }, (_, i) => (
               <i key={i} />

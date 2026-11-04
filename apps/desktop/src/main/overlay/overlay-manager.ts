@@ -39,10 +39,15 @@ export class OverlayManager {
   private ghost = false
   private visible = true
   private panelHiddenAt = 0
+  /** O painel abriu uma janela do sistema (escolher arquivo): perder o foco não fecha. */
+  private panelHeld = false
+  private panelHoldTimer: NodeJS.Timeout | null = null
   private moveSettleTimer: NodeJS.Timeout | null = null
   /** Última posição definida por código: eventos 'move' chegam depois (assíncronos). */
   private expectedPosition: { x: number; y: number } | null = null
   private trackUserMoves = false
+  /** Arrasto em andamento: distância do cursor até o canto do pill. */
+  private dragOffset: { x: number; y: number } | null = null
 
   create(): void {
     this.pill = this.createPill()
@@ -120,6 +125,33 @@ export class OverlayManager {
     // Arrasto do usuário (-webkit-app-region: drag): encaixa quando ele para de mover.
     if (this.moveSettleTimer) clearTimeout(this.moveSettleTimer)
     this.moveSettleTimer = setTimeout(() => this.snapAndSave(), 220)
+  }
+
+  /**
+   * Arrasto feito por nós (sem -webkit-app-region): no Windows, a região de arrasto de janelas
+   * transparentes às vezes fica desatualizada depois de redimensionar ou ocultar, e aí o pill
+   * inteiro vira "alça" — os cliques param de funcionar. Aqui o pill só manda os passos e o
+   * main lê o cursor (já em coordenadas de tela, sem problema de escala).
+   */
+  drag(phase: 'start' | 'move' | 'end'): void {
+    const cursor = screen.getCursorScreenPoint()
+    if (phase === 'start') {
+      const { x, y } = this.pill.getBounds()
+      this.dragOffset = { x: cursor.x - x, y: cursor.y - y }
+      return
+    }
+    if (!this.dragOffset) return
+    const { width, height } = this.pill.getBounds()
+    this.setPillBounds({
+      x: Math.round(cursor.x - this.dragOffset.x),
+      y: Math.round(cursor.y - this.dragOffset.y),
+      width,
+      height,
+    })
+    if (phase === 'end') {
+      this.dragOffset = null
+      this.snapAndSave()
+    }
   }
 
   private snapAndSave(): void {
@@ -222,7 +254,9 @@ export class OverlayManager {
     hardenNavigation(panel)
 
     // Comportamento de popover: perdeu o foco, fecha.
-    panel.on('blur', () => this.hidePanel())
+    panel.on('blur', () => {
+      if (!this.panelHeld) this.hidePanel()
+    })
     panel.webContents.on('did-finish-load', () => this.broadcastState())
     loadPage(panel, 'panel')
     return panel
@@ -246,6 +280,13 @@ export class OverlayManager {
     this.panel.show()
     this.panel.focus()
     this.broadcastState()
+  }
+
+  holdPanel(hold: boolean): void {
+    this.panelHeld = hold
+    if (this.panelHoldTimer) clearTimeout(this.panelHoldTimer)
+    // Segurança: se o aviso de "terminou" se perder, volta ao normal sozinho.
+    this.panelHoldTimer = hold ? setTimeout(() => (this.panelHeld = false), 5 * 60_000) : null
   }
 
   hidePanel(): void {
@@ -295,12 +336,8 @@ export class OverlayManager {
   /** Modo fantasma: cliques atravessam o pill (§3.2). Sai pelo mesmo atalho. */
   setGhost(ghost: boolean): void {
     this.ghost = ghost
-    if (ghost) {
-      this.hidePanel()
-      this.pill.setIgnoreMouseEvents(true, { forward: true })
-    } else {
-      this.pill.setIgnoreMouseEvents(false)
-    }
+    if (ghost) this.hidePanel()
+    this.applyMouse()
     this.broadcastState()
   }
 
@@ -308,15 +345,31 @@ export class OverlayManager {
     this.setGhost(!this.ghost)
   }
 
+  /**
+   * Ocultar/mostrar o overlay. O pill não é escondido com hide(): no Windows, uma janela
+   * transparente e não focável às vezes volta do hide()/showInactive() sem aceitar cliques.
+   * Em vez disso fica invisível (opacidade 0) e deixa os cliques passarem.
+   */
   setVisible(visible: boolean): void {
     this.visible = visible
     if (visible) {
-      this.pill.showInactive()
+      if (!this.pill.isVisible()) this.pill.showInactive()
+      this.pill.setOpacity(1)
+      this.applyMouse()
+      this.pill.setAlwaysOnTop(true, 'screen-saver')
     } else {
       this.hidePanel()
-      this.pill.hide()
+      this.pill.setOpacity(0)
+      this.pill.setIgnoreMouseEvents(true)
     }
     this.broadcastState()
+  }
+
+  /** Cliques no pill: atravessam no modo fantasma ou com o overlay oculto. */
+  private applyMouse(): void {
+    if (!this.visible) this.pill.setIgnoreMouseEvents(true)
+    else if (this.ghost) this.pill.setIgnoreMouseEvents(true, { forward: true })
+    else this.pill.setIgnoreMouseEvents(false)
   }
 
   toggleVisible(): void {

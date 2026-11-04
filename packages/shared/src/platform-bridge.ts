@@ -33,12 +33,16 @@ export interface PlatformBridge {
     getState(): Promise<OverlayState>
     setGhost(ghost: boolean): void
     moveTo(corner: OverlayCorner): void
+    /** Arrasto do pill pela lombada (o main lê a posição do cursor). */
+    drag(phase: 'start' | 'move' | 'end'): void
     onStateChange(listener: (state: OverlayState) => void): Unsubscribe
   }
   panel: {
     toggle(tab?: PanelTab): void
     close(): void
     resize(size: Size): void
+    /** Mantém o painel aberto mesmo sem foco (ex.: enquanto a janela de escolher arquivo está aberta). */
+    hold(hold: boolean): void
     onOpenTab(listener: (tab: PanelTab) => void): Unsubscribe
   }
   hotkeys: {

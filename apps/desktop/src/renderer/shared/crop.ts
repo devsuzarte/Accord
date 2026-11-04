@@ -38,6 +38,9 @@ export async function cropGif(
 ): Promise<string> {
   const decoder = new ImageDecoder({ data: await file.arrayBuffer(), type: 'image/gif' })
   try {
+    // Os quadros só são contados depois que as faixas ficam prontas: sem isto, frameCount = 1
+    // e o GIF saía parado.
+    await decoder.tracks.ready
     await decoder.completed
     const track = decoder.tracks.selectedTrack
     const total = Math.min(track?.frameCount ?? 1, MAX_FRAMES)

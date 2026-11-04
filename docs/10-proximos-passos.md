@@ -111,6 +111,14 @@ Sem contas ainda: cada um digita um nome e entra no canal "Geral". É um atalho 
 | 8.5 | **Idiomas** PT-BR e EN: dicionários em `packages/shared/src/i18n/`, idioma salvo no main e avisado a todas as janelas; servidor responde com códigos de erro | `useT()` em `renderer/shared/i18n.ts` |
 | 8.6 | Nome só na aba Você; fora da chamada o pill não tem seta de recolher; painel com 360 px | `Pill.tsx`, `ChannelsTab.tsx` |
 
+### Correções de 04/11/2026 (depois do primeiro teste no Windows)
+
+- **Painel fechava ao escolher arquivo** (foto, fundo): a janela do sistema tirava o foco e o painel fecha ao perder o foco. Agora o painel fica "segurado" enquanto a janela de arquivos está aberta (`panel.hold`, `shared/filePicker.ts`).
+- **GIF ficava parado**: o `ImageDecoder` só conta os quadros depois de `tracks.ready`; sem esperar, `frameCount` vinha 1 e o GIF saía com um quadro só. Quem já tinha colocado um GIF precisa escolher de novo.
+- **Cliques paravam de funcionar** (principalmente depois de Ctrl+Shift+O): o pill não usa mais `-webkit-app-region: drag` (o arrasto é feito pelo main seguindo o cursor) e ocultar o overlay agora deixa o pill invisível e "atravessável" em vez de `hide()`/`showInactive()`. [Hipótese] a causa era a região de arrasto desatualizada da janela transparente; validar no Windows.
+- **Tela inteira com o som do app**: a captura já exclui a árvore de processos do app (o serviço de áudio é filho do processo principal). O log agora mostra os pids envolvidos. [Hipótese] o som captado vinha de uma segunda instância do app no mesmo PC (outra árvore de processos, que o Windows não deixa excluir junto).
+- Qualidades: saiu 1080p a 15 fps, entrou **720p a 60 fps** ("Leve e fluido", ~4 Mbps).
+
 **Limites conhecidos:** Tailscale não repassa broadcast (por isso os peers vêm do `tailscale status`); se o Radmin bloquear o broadcast, o PC só aparece depois de algum tráfego com ele (tabela ARP) ou pelo endereço manual.
 
 ---

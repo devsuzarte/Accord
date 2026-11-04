@@ -52,7 +52,13 @@ export function Panel() {
     <div ref={frameRef} className="surface-frame">
       <section className="panel material" aria-label={t('panel.label')}>
         <header className="panel__head">
-          <img className="panel__logo" src={logoUrl} alt="Accord" title="Accord" draggable={false} />
+          <img
+            className="panel__logo"
+            src={logoUrl}
+            alt="Accord"
+            title="Accord"
+            draggable={false}
+          />
           <div className="tabs" role="tablist">
             {tabs.map((id) => (
               <button

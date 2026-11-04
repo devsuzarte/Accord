@@ -43,7 +43,7 @@ export interface ParticipantState {
 
 export type OverlayMode = 'hidden' | 'collapsed' | 'compact' | 'expanded'
 
-export type StreamQualityPreset = 'detail' | 'balanced' | 'motion' | 'fluid'
+export type StreamQualityPreset = 'balanced' | 'smooth' | 'motion' | 'fluid'
 
 export interface HealthResponse {
   status: 'ok'

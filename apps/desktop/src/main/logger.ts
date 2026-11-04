@@ -40,9 +40,7 @@ export function setupLogging(): void {
   }
   process.on('uncaughtException', (error) => console.error('[crash] exceção não tratada', error))
   process.on('unhandledRejection', (reason) => console.error('[crash] promessa rejeitada', reason))
-  console.info(
-    `[app] Accord ${app.getVersion()} iniciando (Electron ${process.versions.electron})`,
-  )
+  console.info(`[app] Accord ${app.getVersion()} iniciando (Electron ${process.versions.electron})`)
 }
 
 /** Erros e avisos das janelas também vão para o log. */
