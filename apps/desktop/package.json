@@ -11,7 +11,7 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json",
-    "package": "electron-vite build && electron-builder --win --config electron-builder.yml",
+    "package": "electron-vite build && electron-builder --win --config electron-builder.yml --publish never",
     "dev:second": "bun scripts/second-instance.ts"
   },
   "dependencies": {

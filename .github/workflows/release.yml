@@ -1,0 +1,87 @@
+# Gera o instalador num Windows de verdade e publica a versão no GitHub Releases.
+#
+# Como usar: aumente a versão nos três package.json, faça o commit e envie uma tag:
+#   git tag v0.3.0 && git push origin v0.3.0
+# Tag com hífen (ex.: v0.3.0-beta.1) vira pré-lançamento: não chega na atualização automática.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  LIVEKIT_VERSION: 1.13.11
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Conferir a versão com a tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $version = (Get-Content apps/desktop/package.json | ConvertFrom-Json).version
+          $tag = "${{ github.ref_name }}".TrimStart('v')
+          if ($version -ne $tag) {
+            Write-Error "A tag ($tag) não bate com a versão do apps/desktop/package.json ($version)."
+            exit 1
+          }
+
+      - name: Instalar dependências
+        run: bun install --frozen-lockfile
+
+      - name: Baixar o servidor de voz (LiveKit) e conferir o checksum
+        shell: pwsh
+        run: |
+          $v = $env:LIVEKIT_VERSION
+          $base = "https://github.com/livekit/livekit/releases/download/v$v"
+          $zip = "livekit_${v}_windows_amd64.zip"
+          Invoke-WebRequest "$base/$zip" -OutFile $zip
+          Invoke-WebRequest "$base/checksums.txt" -OutFile checksums.txt
+          $expected = (Select-String -Path checksums.txt -Pattern ([regex]::Escape($zip))).Line.Split(' ')[0]
+          $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          if ($expected -ne $actual) { Write-Error "Checksum do LiveKit não confere."; exit 1 }
+          New-Item -ItemType Directory -Force infra/bin | Out-Null
+          Expand-Archive $zip -DestinationPath livekit-tmp -Force
+          $exe = Get-ChildItem livekit-tmp -Recurse -Filter livekit-server.exe | Select-Object -First 1
+          Copy-Item $exe.FullName infra/bin/livekit-server.exe
+
+      - name: Gerar servidor e instalador
+        run: bun run package
+
+      - name: Publicar a versão
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          $files = @(
+            "release/app/Accord-Setup-$version.exe",
+            "release/app/Accord-Setup-$version.exe.blockmap",
+            "release/app/latest.yml"
+          )
+          $extra = @()
+          if ($tag.Contains('-')) { $extra += '--prerelease' } else { $extra += '--latest' }
+          gh release create $tag @files --title "Accord $version" --generate-notes @extra
+
+      - name: Guardar os arquivos (execução manual)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: accord-windows
+          path: |
+            release/app/*.exe
+            release/app/*.blockmap
+            release/app/latest.yml

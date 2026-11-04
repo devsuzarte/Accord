@@ -6,3 +6,4 @@ release
 bun.lock
 apps/api/drizzle
 docs
+*.md
