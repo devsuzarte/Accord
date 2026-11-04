@@ -28,6 +28,7 @@ export default defineConfig({
           panel: resolve(__dirname, 'src/renderer/panel/index.html'),
           picker: resolve(__dirname, 'src/renderer/picker/index.html'),
           people: resolve(__dirname, 'src/renderer/people/index.html'),
+          chat: resolve(__dirname, 'src/renderer/chat/index.html'),
           viewer: resolve(__dirname, 'src/renderer/viewer/index.html'),
         },
       },

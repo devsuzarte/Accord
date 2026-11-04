@@ -1308,3 +1308,77 @@ kbd[data-broken] {
   flex: 1;
   min-width: 0;
 }
+
+/* ── Atualizações (aba Você) ─────────────────────────── */
+
+.update {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.update__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.update .action {
+  flex-shrink: 0;
+  gap: 6px;
+  height: 32px;
+}
+
+/* ── Senha do canal ──────────────────────────────────── */
+
+.password {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+}
+
+.password__icon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.password__input {
+  flex: 1;
+  min-width: 0;
+  padding-left: 34px;
+  padding-right: 40px;
+}
+
+.password__toggle {
+  position: absolute;
+  right: 4px;
+}
+
+.server__lock {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--status-yellow) 18%, transparent);
+  color: var(--status-yellow);
+}
+
+.server__password {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.hosting__locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--status-yellow);
+}

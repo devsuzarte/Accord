@@ -5,8 +5,8 @@ O layout do pill e do painel está **aprovado**. Este documento reorganiza o [ro
 Cada marco termina com algo que dá para **usar e mostrar**. Tamanhos relativos: P (pequeno), M (médio), G (grande).
 
 ```
- M1 Ligação ─► M2 Tela ─► M5 Som do app ─► M6 Entrega ─► M7 Moderação ─► M8 Hospedar, achar e idiomas     M3 Contas · M4 Convites
-     ✅          ✅           ✅              ✅            ✅               ✅                                ⏸ adiados
+ M1 Ligação ─► M2 Tela ─► M5 Som do app ─► M6 Entrega ─► M7 Moderação ─► M8 Hospedar, achar e idiomas ─► M9 Chat, senha e troca de host     M3 Contas · M4 Convites
+     ✅          ✅           ✅              ✅            ✅               ✅                              ✅                         ⏸ adiados
 ```
 
 > **Decisão (03/11/2026):** M3 e M4 foram adiados. A entrada continua aberta só com um nome (`POST /join`, desligável com `OPEN_JOIN=false`), e a porta padrão passou a ser **7870**. O servidor é distribuído como um pacote de um clique, que sobe o LiveKit junto.
@@ -27,6 +27,10 @@ Tudo abaixo foi implementado e testado no Linux do ambiente de desenvolvimento, 
 - [ ] "Fluido" (60 fps): o log mostra `captura 1920x1080 a 60 fps` e quem assiste vê movimento suave num jogo
 - [ ] Lista de pessoas: abre ao lado do pill, clique direito funciona, e fechar com Esc
 - [ ] Sons do app saem no fone escolhido em "Saída de som"
+- [ ] Depois de Win+L, de a tela apagar e de Ctrl+Shift+O, o pill continua respondendo aos cliques
+- [ ] Volume de uma pessoa em 200% soa mais alto e em 0% some
+- [ ] Troca de host com PCs de verdade (um deles fecha o app no meio da chamada)
+- [ ] Atualização automática: publicar uma 0.2.1 e ver a 0.2.0 instalada atualizar
 - [ ] Hospedar pelo app instalado: o Windows pede o firewall para o `accord-server.exe` e o `livekit-server.exe`; fechar o app encerra os dois
 - [ ] Um segundo PC na mesma rede **e** um no Radmin VPN veem o canal em "Canais encontrados" sem digitar nada
 - [ ] Recortar um GIF de verdade (da internet): a foto continua animada para os outros
@@ -120,6 +124,28 @@ Sem contas ainda: cada um digita um nome e entra no canal "Geral". É um atalho 
 - Qualidades: saiu 1080p a 15 fps, entrou **720p a 60 fps** ("Leve e fluido", ~4 Mbps).
 
 **Limites conhecidos:** Tailscale não repassa broadcast (por isso os peers vêm do `tailscale status`); se o Radmin bloquear o broadcast, o PC só aparece depois de algum tráfego com ele (tabela ARP) ou pelo endereço manual.
+
+---
+
+## M9 — Chat, senha, troca de host, volume por pessoa e atualização (G) · ✅ implementado (04/11/2026)
+
+> Testado com três instâncias (A hospeda com senha; B e C entram): sem senha o servidor recusa (401) e senha errada mostra "Senha incorreta"; o chat entrega texto e imagem para todos; o modo mínimo mostra as mensagens rolando; volume de 150% aplicado; a cópia da sessão chegou em B (com o anexo) e em C. Depois **o PC de A foi derrubado** (app e servidor mortos de uma vez): B abriu o próprio servidor com a cópia e virou dono, C reconectou em B sozinho, as 2 mensagens e a imagem continuaram, a senha também, e a conversa seguiu. Sair do app pelo jeito normal encerra o servidor aberto por ele.
+
+| # | O que | Onde |
+|---|---|---|
+| 9.1 | **Travamento depois de Win+L/inatividade**: desligado o cálculo de "janela coberta" do Chromium (`CalculateNativeWinOcclusion`) e, ao desbloquear/voltar, as janelas são redesenhadas e voltam para o topo. [Hipótese] era a causa; validar no Windows | `src/main/index.ts` |
+| 9.2 | **Atualização automática** pelo GitHub Releases | `src/main/updater.ts`, [12](12-publicar-versao.md) |
+| 9.3 | **Senha do canal** (`x-accord-password` em `/join`, `/avatar`, `/chat/*`, `/session/*`; `/info` mostra `locked`) | `apps/api/src/services/session.ts` |
+| 9.4 | **Chat temporário**: mensagens e anexos (até 15 MB cada, 300 MB por sessão) na memória e numa pasta temporária do servidor, apagados quando ele fecha; avisos pelos dados do LiveKit (tópico `accord.chat`, só vale o que vem do servidor) | `routes/session.ts`, `renderer/chat/`, `main/overlay/chat-window.ts` |
+| 9.5 | **Troca de host** (first in, first host): fila pela ordem de entrada no LiveKit, endereços de cada um no atributo `addrs`, cópia da sessão a cada 10 s (todos guardam texto; os 2 primeiros da fila guardam também os anexos) | `pill/call/migration.ts`, `main/network/session-mirror.ts` |
+| 9.6 | **Volume por pessoa** 0–200%: vozes pelo WebAudio (`webAudioMix`), ganho por pessoa | `shared/localVolumes.ts` |
+| 9.7 | Licença MIT e avisos de terceiros | `LICENSE`, `THIRD_PARTY_NOTICES.md` |
+
+**Limites conhecidos da troca de host:**
+- Se for a **sua** internet que caiu (e não o host), o app não consegue diferenciar e, se você for o primeiro da fila, abre um servidor só seu. Quando a internet volta, entre de novo no canal do host.
+- Admins promovidos não passam para o host novo (o papel é por identidade); os silêncios "para todos" passam.
+- Mensagens enviadas nos últimos segundos antes da queda podem faltar para quem não as recebeu.
+- Só funciona se o app de quem assume puder hospedar (firewall liberado e o servidor junto no instalador).
 
 ---
 

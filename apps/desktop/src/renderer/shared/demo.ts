@@ -16,6 +16,7 @@ function person(
     serverAudioBlocked: false,
     localMicMuted: false,
     localAudioMuted: false,
+    volume: 1,
     avatarUrl: null,
     speaking: false,
     micMuted: false,

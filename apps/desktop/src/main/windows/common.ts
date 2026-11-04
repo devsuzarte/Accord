@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { shell } from 'electron'
 import type { BrowserWindow, BrowserWindowConstructorOptions, WebPreferences } from 'electron'
 
-export type Page = 'pill' | 'panel' | 'picker' | 'people' | 'viewer'
+export type Page = 'pill' | 'panel' | 'picker' | 'people' | 'chat' | 'viewer'
 
 /** Preferências de segurança obrigatórias (docs/02-arquitetura.md › Segurança Electron). */
 export function secureWebPreferences(extra: WebPreferences = {}): WebPreferences {

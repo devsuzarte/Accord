@@ -33,6 +33,8 @@ export interface ParticipantState {
   localMicMuted: boolean
   /** Você silenciou o som da transmissão dessa pessoa só para você. */
   localAudioMuted: boolean
+  /** Volume da voz dessa pessoa só para você: 0 a 2 (0% a 200%). */
+  volume: number
   displayName: string
   avatarUrl: string | null
   speaking: boolean
@@ -92,7 +94,7 @@ export interface CallSnapshot {
 
 /** Comandos que o painel manda para o pill (via main). */
 export type CallCommand =
-  | { type: 'join'; name: string; serverUrl: string }
+  | { type: 'join'; name: string; serverUrl: string; password?: string | null }
   | { type: 'leave' }
   | { type: 'toggle-mic' }
   | { type: 'toggle-deafen' }
@@ -101,6 +103,7 @@ export type CallCommand =
   | { type: 'set-noise'; mode: AudioState['noiseSuppression'] }
   | { type: 'set-sounds'; enabled: boolean }
   | { type: 'local-mute'; name: string; kind: 'mic' | 'audio'; muted: boolean }
+  | { type: 'set-volume'; name: string; volume: number }
   | { type: 'moderate'; action: ModerationAction; target: string }
   | { type: 'watch'; identity: string }
 
@@ -149,6 +152,8 @@ export interface ViewerTarget {
   identity: string
   name: string
   serverUrl: string
+  /** Senha do canal, se houver (o viewer entra com conexão própria). */
+  password?: string | null
 }
 
 // ───────────────────────── Perfil e aparência ─────────────────────────
@@ -204,6 +209,8 @@ export interface ServerInfo {
   version: string
   port: number
   channels: ChannelInfo[]
+  /** Pede senha para entrar. */
+  locked: boolean
 }
 
 /** Por onde o servidor foi achado (decide o rótulo e a ordem na lista). */
@@ -236,6 +243,14 @@ export interface HostState {
   addresses: HostAddress[]
   /** Código do erro (traduzido no painel). */
   error: 'port-in-use' | 'crashed' | 'timeout' | null
+  /** O canal aberto por este app pede senha. */
+  locked: boolean
+}
+
+export interface HostStartOptions {
+  password?: string | null
+  /** Continuar a sessão de um host que caiu (com a cópia guardada neste PC). */
+  restore?: boolean
 }
 
 /** Erros de `POST /moderate` (o app traduz). */
@@ -246,3 +261,90 @@ export type ModerationError =
   | 'not-self'
   | 'owner-protected'
   | 'voice-unreachable'
+
+// ───────────────────────── Atualização automática ─────────────────────────
+
+export interface UpdateState {
+  status: 'disabled' | 'idle' | 'checking' | 'latest' | 'downloading' | 'ready' | 'error'
+  /** Versão nova encontrada (baixando ou pronta). */
+  version: string | null
+  /** 0 a 100 enquanto baixa. */
+  progress: number
+}
+
+// ───────────────────────── Senha, chat e sessão ─────────────────────────
+
+/** Cabeçalho com a senha do canal (quando o host definiu uma). */
+export const PASSWORD_HEADER = 'x-accord-password'
+/** Tópico das mensagens de chat enviadas pelo servidor (dados do LiveKit). */
+export const CHAT_TOPIC = 'accord.chat'
+export const CHAT_MAX_TEXT = 2000
+export const CHAT_MAX_FILE_BYTES = 15 * 1024 * 1024
+export const CHAT_MAX_ATTACHMENTS = 4
+
+export type SessionError =
+  | 'password-required'
+  | 'wrong-password'
+  | 'invalid-session'
+  | 'too-large'
+  | 'session-full'
+  | 'bad-message'
+  | 'not-found'
+
+export interface ChatAttachment {
+  id: string
+  name: string
+  /** Tipo MIME. */
+  type: string
+  size: number
+  image: boolean
+  /** Caminho no servidor (`/chat/files/<id>`); some quando a sessão acaba. */
+  path: string
+}
+
+export interface ChatMessage {
+  id: string
+  /** Quando o servidor recebeu (ms desde 1970). */
+  at: number
+  identity: string
+  name: string
+  /** Caminho da foto no servidor, se houver. */
+  avatar: string | null
+  text: string
+  attachments: ChatAttachment[]
+}
+
+/** Mensagem que o servidor manda pelo tópico CHAT_TOPIC. */
+export type ChatEvent = { type: 'message'; message: ChatMessage }
+
+/**
+ * Cópia da sessão que os próximos da fila guardam, para continuar se o host cair:
+ * senha, chat (os anexos vão em arquivos ao lado) e quem o dono silenciou.
+ */
+export interface SessionSnapshot {
+  version: 1
+  savedAt: number
+  password: string | null
+  messages: ChatMessage[]
+  files: ChatAttachment[]
+  blocks: Record<string, { mic: boolean; audio: boolean }>
+}
+
+/** O que o pill conta para o main e a janela de chat (o chat vive no pill, como a chamada). */
+export interface ChatState {
+  messages: ChatMessage[]
+  /** Para a janela de chat enviar direto ao servidor. */
+  access: { serverUrl: string; token: string; password: string | null } | null
+  channelName: string | null
+  /** Sua identidade (para destacar suas mensagens). */
+  identity: string | null
+}
+
+/** Para onde a sessão vai se o host cair: ordem de chegada e endereços de cada um. */
+export interface SessionMirrorRequest {
+  serverUrl: string
+  token: string
+  password: string | null
+  /** Baixar também os anexos (só os dois primeiros da fila). */
+  files: boolean
+}

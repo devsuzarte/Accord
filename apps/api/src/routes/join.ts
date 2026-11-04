@@ -1,9 +1,11 @@
-import type { JoinResponse } from '@sharescreen/shared'
+import type { JoinResponse, SessionError } from '@sharescreen/shared'
+import { PASSWORD_HEADER } from '@sharescreen/shared'
 import { Elysia, t } from 'elysia'
 import { AccessToken } from 'livekit-server-sdk'
 import { env } from '../env'
 import { allowedSources, CHANNEL_NAME, ROOM } from '../services/livekit'
 import { blocksOf, isLoopback, rememberName, roleOf, setRole } from '../services/roles'
+import { checkPassword } from '../services/session'
 
 /**
  * Se o LIVEKIT_URL aponta para localhost, devolve o mesmo host que o cliente usou para
@@ -27,7 +29,18 @@ function livekitUrlFor(request: Request): string {
  */
 export const joinRoutes = new Elysia().post(
   '/join',
-  async ({ body, request, server }): Promise<JoinResponse> => {
+  async ({
+    body,
+    headers,
+    request,
+    server,
+    set,
+  }): Promise<JoinResponse | { error: SessionError }> => {
+    const passwordError = checkPassword(headers[PASSWORD_HEADER])
+    if (passwordError) {
+      set.status = 401
+      return { error: passwordError }
+    }
     const name = body.name.trim()
     const viewer = body.viewer === true
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'pessoa'

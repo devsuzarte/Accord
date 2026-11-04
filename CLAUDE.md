@@ -41,6 +41,13 @@ App desktop de voz + compartilhamento de tela em overlay, inspirado no Discord. 
 - Ícones: `apps/desktop/resources/` (`logo.svg` original, `icon.png`/`icon.ico` do app, `tray.png`/`tray@2x.png`)
 - Build do Windows a partir do Linux funciona com wine + wine32 (o NSIS roda o desinstalador no wine) e o `@koromix/koffi-win32-x64` presente em node_modules
 
+- Senha do canal: cabeçalho `x-accord-password` (`PASSWORD_HEADER`); a senha vive em `apps/api/src/services/session.ts` (env `SHARESCREEN_PASSWORD` ao abrir; `POST /session/password` só do próprio PC)
+- Chat: servidor guarda em memória + pasta temporária (`routes/session.ts`) e avisa pela sala (`sendData`, tópico `accord.chat`); o pill guarda as mensagens (`pill/call/chat.ts`) e publica `ChatState` → main (`overlay/chat-window.ts`) → janela `chat` (modos `expanded`/`mini`). A janela de chat envia direto ao servidor com o token
+- Troca de host: `pill/call/migration.ts` (fila por `joinedAt`, atributo `addrs`), `main/network/session-mirror.ts` (cópia a cada 10 s em userData/sessao-copia) e `HostService.start({ restore: true })` → env `SHARESCREEN_RESTORE`
+- Vozes tocam pelo WebAudio (`webAudioMix`): volume, ensurdecer e "mutar para mim" são `participant.setVolume`, nunca `<audio>.muted`
+- Atualização automática: `src/main/updater.ts` (electron-updater, GitHub). Publicar: `docs/12-publicar-versao.md`
+- Windows: `disable-features=CalculateNativeWinOcclusion` evita janelas do overlay "congeladas" depois de bloqueio/inatividade
+
 ## Convenções
 - Docs e UI em PT-BR
 - Marcar suposições em docs como [Hipótese] até validar; nunca inventar comportamento de API sem checar a documentação

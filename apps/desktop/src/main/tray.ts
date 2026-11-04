@@ -3,6 +3,7 @@ import { tm } from './i18n'
 import { diagnosticReport, logDirectory } from './logger'
 import trayIconPath from '../../resources/tray.png?asset'
 import type { OverlayManager } from './overlay/overlay-manager'
+import type { Updater } from './updater'
 
 /**
  * Sem janela principal e fora da barra de tarefas, a bandeja é a "porta de saída" do app.
@@ -10,6 +11,7 @@ import type { OverlayManager } from './overlay/overlay-manager'
 export function createTray(
   overlay: OverlayManager,
   profile?: string,
+  updater?: Updater,
 ): { tray: Tray; rebuild: () => void } {
   const tray = new Tray(nativeImage.createFromPath(trayIconPath))
   tray.setToolTip(profile ? `Accord (${profile})` : 'Accord')
@@ -57,6 +59,14 @@ export function createTray(
           ],
         },
         { type: 'separator' },
+        ...(updater?.getState().status === 'ready'
+          ? [
+              {
+                label: tm('tray.installUpdate', { version: updater.getState().version ?? '' }),
+                click: () => updater.install(),
+              },
+            ]
+          : []),
         { label: tm('tray.quit'), click: () => app.quit() },
       ]),
     )

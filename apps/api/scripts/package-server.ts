@@ -49,6 +49,9 @@ if (existsSync(livekitSource)) {
   )
 }
 
+// O LiveKit é Apache-2.0: a licença vai junto com o binário.
+copyFileSync(join(root, 'infra', 'LICENSE-apache-2.0.txt'), join(out, 'LICENSE-livekit.txt'))
+
 writeFileSync(
   join(out, 'LEIA-ME.txt'),
   `SERVIDOR DO ACCORD

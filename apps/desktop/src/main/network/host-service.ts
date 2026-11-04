@@ -4,7 +4,8 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { app, BrowserWindow } from 'electron'
 import { DEFAULT_API_PORT, IpcChannel } from '@sharescreen/shared'
-import type { HostAddress, HostState } from '@sharescreen/shared'
+import type { HostAddress, HostStartOptions, HostState } from '@sharescreen/shared'
+import type { SessionMirror } from './session-mirror'
 import { localInterfaces } from './interfaces'
 
 const LOCAL_URL = `http://127.0.0.1:${DEFAULT_API_PORT}`
@@ -28,7 +29,15 @@ interface Command {
  */
 export class HostService {
   private child: ChildProcess | null = null
-  private state: HostState = { status: 'stopped', url: LOCAL_URL, addresses: [], error: null }
+  private state: HostState = {
+    status: 'stopped',
+    url: LOCAL_URL,
+    addresses: [],
+    error: null,
+    locked: false,
+  }
+
+  constructor(private readonly mirror: SessionMirror) {}
   private stderrTail = ''
   /** O próprio app pediu para parar (a saída do processo não é erro). */
   private stopping = false
@@ -42,16 +51,49 @@ export class HostService {
     if (!this.child && this.state.status !== 'starting') {
       const running = await this.isUp()
       const status = running ? 'external' : this.command() ? 'stopped' : 'unavailable'
-      if (status !== this.state.status) this.update({ status, error: null })
+      const locked = running ? await this.isLocked() : false
+      if (status !== this.state.status || locked !== this.state.locked) {
+        this.update({ status, error: null, locked })
+      }
     }
     return this.getState()
   }
 
-  async start(): Promise<void> {
+  async start(options: HostStartOptions = {}): Promise<HostState> {
+    await this.run(options)
+    return this.getState()
+  }
+
+  /** Troca a senha do servidor aberto aqui (só o próprio PC pode). */
+  async setPassword(password: string | null): Promise<boolean> {
+    try {
+      const response = await fetch(`${LOCAL_URL}/session/password`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ password }),
+        signal: AbortSignal.timeout(3000),
+      })
+      if (!response.ok) return false
+      this.update({ locked: !!password })
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private async run(options: HostStartOptions): Promise<void> {
     if (this.child || this.state.status === 'starting') return
     if (await this.isUp()) return this.update({ status: 'external', error: null })
     const command = this.command()
     if (!command) return this.update({ status: 'unavailable', error: null })
+    const password = options.password?.trim() || ''
+    if (password) command.env.SHARESCREEN_PASSWORD = password
+    if (options.restore && this.mirror.hasCopy()) {
+      // Migração: o servidor novo continua a sessão a partir da cópia deste PC.
+      this.mirror.pause()
+      command.env.SHARESCREEN_RESTORE = this.mirror.dir
+      console.info('[hospedar] continuando a sessão do host anterior')
+    }
 
     this.update({ status: 'starting', error: null })
     console.info(`[hospedar] abrindo ${command.file} ${command.args.join(' ')}`)
@@ -79,7 +121,7 @@ export class HostService {
       console.info(`[hospedar] servidor encerrou (código ${code})`)
       if (this.stopping) {
         this.stopping = false
-        this.update({ status: 'stopped', error: null })
+        this.update({ status: 'stopped', error: null, locked: false })
         return
       }
       const inUse = /EADDRINUSE|address already in use|port.*in use/i.test(this.stderrTail)
@@ -91,7 +133,7 @@ export class HostService {
     const deadline = Date.now() + 20_000
     while (this.child === child && Date.now() < deadline) {
       if (await this.isUp()) {
-        this.update({ status: 'running', error: null })
+        this.update({ status: 'running', error: null, locked: await this.isLocked() })
         return
       }
       await new Promise((r) => setTimeout(r, 400))
@@ -115,6 +157,15 @@ export class HostService {
       }
     } catch (error) {
       console.warn('[hospedar] falha ao encerrar o servidor', error)
+    }
+  }
+
+  private async isLocked(): Promise<boolean> {
+    try {
+      const response = await fetch(`${LOCAL_URL}/info`, { signal: AbortSignal.timeout(1500) })
+      return ((await response.json()) as { locked?: boolean }).locked === true
+    } catch {
+      return false
     }
   }
 

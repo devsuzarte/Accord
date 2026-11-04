@@ -17,6 +17,10 @@ import {
   Check,
   ChevronDown,
   Copy,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Lock,
   HeadphoneOff,
   Loader,
   LogIn,
@@ -32,13 +36,27 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { channelLabel, useT } from '../shared/i18n'
-import { readJson, write } from '../shared/storage'
+import { readJson, readString, write } from '../shared/storage'
 import { AudioSettings } from './AudioSettings'
 
 type Mode = 'join' | 'host' | 'guide'
 
 const SAVED_KEY = 'sharescreen.servers.saved'
 const LAST_SERVER_KEY = 'sharescreen.join.server'
+/** Senhas dos canais em que você já entrou (por endereço) e a do seu próprio canal. */
+const PASSWORDS_KEY = 'sharescreen.passwords'
+const HOST_PASSWORD_KEY = 'sharescreen.host.password'
+
+function savedPassword(url: string): string {
+  return readJson<Record<string, string>>(PASSWORDS_KEY, {})[url] ?? ''
+}
+
+function rememberPassword(url: string, password: string): void {
+  const all = readJson<Record<string, string>>(PASSWORDS_KEY, {})
+  if (password) all[url] = password
+  else delete all[url]
+  write(PASSWORDS_KEY, all)
+}
 
 interface ChannelsTabProps {
   call: CallSnapshot
@@ -151,9 +169,52 @@ function NeedName({ onEditProfile }: { onEditProfile(): void }) {
   )
 }
 
-function join(profile: Profile, serverUrl: string): void {
+function join(profile: Profile, serverUrl: string, password: string | null = null): void {
   write(LAST_SERVER_KEY, serverUrl)
-  window.platform.call.command({ type: 'join', name: profile.name, serverUrl })
+  if (password !== null) rememberPassword(serverUrl, password)
+  window.platform.call.command({ type: 'join', name: profile.name, serverUrl, password })
+}
+
+/** Campo de senha com o botão de mostrar/esconder. */
+function PasswordInput({
+  value,
+  onChange,
+  placeholder,
+  autoFocus,
+}: {
+  value: string
+  onChange(value: string): void
+  placeholder: string
+  autoFocus?: boolean
+}) {
+  const t = useT()
+  const [visible, setVisible] = useState(false)
+  return (
+    <span className="password">
+      <KeyRound size={15} className="password__icon" aria-hidden />
+      <input
+        className="field__input password__input"
+        type={visible ? 'text' : 'password'}
+        value={value}
+        maxLength={64}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        autoFocus={autoFocus}
+        spellCheck={false}
+        autoComplete="off"
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <button
+        type="button"
+        className="icon-button password__toggle"
+        aria-label={visible ? t('common.hide') : t('common.show')}
+        title={visible ? t('common.hide') : t('common.show')}
+        onClick={() => setVisible((v) => !v)}
+      >
+        {visible ? <EyeOff size={15} /> : <Eye size={15} />}
+      </button>
+    </span>
+  )
 }
 
 function JoinList({ call, profile, onEditProfile }: ChannelsTabProps) {
@@ -259,9 +320,9 @@ function JoinList({ call, profile, onEditProfile }: ChannelsTabProps) {
               server={server}
               disabled={!canJoin}
               joining={busy && joiningUrl === server.url}
-              onJoin={() => {
+              onJoin={(password) => {
                 setJoiningUrl(server.url)
-                join(profile, server.url)
+                join(profile, server.url, password)
               }}
             />
           ))}
@@ -329,14 +390,25 @@ function ServerCard({
   server: DiscoveredServer
   disabled: boolean
   joining: boolean
-  onJoin(): void
+  onJoin(password: string | null): void
 }) {
   const t = useT()
+  const [asking, setAsking] = useState(false)
+  const [password, setPassword] = useState(() => savedPassword(server.url))
+  const start = () => {
+    if (server.locked && !asking) setAsking(true)
+    else onJoin(server.locked ? password : null)
+  }
   return (
     <li className="server">
       <div className="server__head">
         <Server size={15} className="server__icon" aria-hidden />
         <span className="server__name">{server.name}</span>
+        {server.locked && (
+          <span className="server__lock" title={t('channels.locked')}>
+            <Lock size={12} aria-label={t('channels.locked')} />
+          </span>
+        )}
         <span className="server__route" data-route={server.route}>
           {t(routeKey(server.route))}
         </span>
@@ -372,7 +444,7 @@ function ServerCard({
               className="action action--small action--primary"
               disabled={disabled}
               aria-label={t('channels.joinIn', { name: channelLabel(channel.id, channel.name) })}
-              onClick={onJoin}
+              onClick={start}
             >
               {joining ? <Loader size={14} className="spin" /> : <LogIn size={14} />}
               {t('channels.joinButton')}
@@ -380,6 +452,30 @@ function ServerCard({
           </li>
         ))}
       </ul>
+      {server.locked && asking && (
+        <form
+          className="server__password"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (password) onJoin(password)
+          }}
+        >
+          <PasswordInput
+            value={password}
+            onChange={setPassword}
+            placeholder={t('channels.passwordPlaceholder')}
+            autoFocus
+          />
+          <button
+            type="submit"
+            className="action action--small action--primary"
+            disabled={disabled || !password}
+          >
+            <LogIn size={14} />
+            {t('channels.joinButton')}
+          </button>
+        </form>
+      )}
     </li>
   )
 }
@@ -419,7 +515,27 @@ function CopyAddress({ address }: { address: string }) {
 function HostSection({ call, profile, onEditProfile }: ChannelsTabProps) {
   const t = useT()
   const host = useHostState()
+  const [password, setPassword] = useState(() => readString(HOST_PASSWORD_KEY, ''))
+  const [saved, setSaved] = useState<'idle' | 'ok' | 'fail'>('idle')
   if (!host) return null
+
+  const updatePassword = (value: string) => {
+    setPassword(value)
+    setSaved('idle')
+    write(HOST_PASSWORD_KEY, value)
+  }
+
+  const passwordField = (
+    <label className="field">
+      <span className="field__label">{t('host.password')}</span>
+      <PasswordInput
+        value={password}
+        onChange={updatePassword}
+        placeholder={t('channels.passwordPlaceholder')}
+      />
+      <span className="field__hint">{t('host.passwordHint')}</span>
+    </label>
+  )
 
   const live = host.status === 'running' || host.status === 'external'
   const inCall = call.status !== 'idle'
@@ -442,11 +558,12 @@ function HostSection({ call, profile, onEditProfile }: ChannelsTabProps) {
           <p className="row__text">{t('host.text')}</p>
         </div>
         {host.error && <p className="notice notice--error">{t(`host.err.${host.error}`)}</p>}
+        {passwordField}
         <button
           type="button"
           className="action action--primary"
           disabled={starting}
-          onClick={() => window.platform.host.start()}
+          onClick={() => void window.platform.host.start({ password: password.trim() || null })}
         >
           {starting ? <Loader size={16} className="spin" /> : <Server size={16} />}
           {starting ? t('host.starting') : t('host.start')}
@@ -463,6 +580,11 @@ function HostSection({ call, profile, onEditProfile }: ChannelsTabProps) {
         {host.status === 'running' ? t('host.running') : t('host.external')}
       </p>
       {host.status === 'external' && <p className="row__text">{t('host.externalText')}</p>}
+      {host.locked && (
+        <p className="hosting__locked">
+          <Lock size={13} aria-hidden /> {t('host.locked')}
+        </p>
+      )}
 
       <div>
         <p className="row__text">
@@ -485,11 +607,31 @@ function HostSection({ call, profile, onEditProfile }: ChannelsTabProps) {
           type="button"
           className="action action--primary"
           disabled={!profile.name}
-          onClick={() => join(profile, normalizeServerUrl(host.url))}
+          onClick={() =>
+            join(profile, normalizeServerUrl(host.url), host.locked ? password.trim() : null)
+          }
         >
           <LogIn size={16} />
           {t('host.joinOwn')}
         </button>
+      )}
+      {host.status === 'running' && (
+        <form
+          className="stack"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void window.platform.host
+              .setPassword(password.trim() || null)
+              .then((ok) => setSaved(ok ? 'ok' : 'fail'))
+          }}
+        >
+          {passwordField}
+          <button type="submit" className="action action--small">
+            {saved === 'ok' ? <Check size={14} /> : <KeyRound size={14} />}
+            {saved === 'ok' ? t('host.passwordSaved') : t('host.passwordSave')}
+          </button>
+          {saved === 'fail' && <p className="notice notice--error">{t('host.passwordFailed')}</p>}
+        </form>
       )}
       {host.status === 'running' && (
         <button

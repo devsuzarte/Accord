@@ -12,10 +12,17 @@ export function roomService(): RoomServiceClient {
 }
 
 /** Confere um token emitido por este servidor e devolve a identidade de quem o usa. */
-export async function verifyToken(token: string): Promise<{ identity: string; room: string }> {
+export async function verifyToken(
+  token: string,
+): Promise<{ identity: string; room: string; name: string; viewer: boolean }> {
   const claims = await new TokenVerifier(env.livekit.apiKey, env.livekit.apiSecret).verify(token)
   if (!claims.sub || !claims.video?.room) throw new Error('Token sem identidade.')
-  return { identity: claims.sub, room: claims.video.room }
+  return {
+    identity: claims.sub,
+    room: claims.video.room,
+    name: claims.name ?? claims.sub,
+    viewer: claims.video.hidden === true,
+  }
 }
 
 /** Fontes que cada participante pode publicar, conforme os bloqueios do dono. */

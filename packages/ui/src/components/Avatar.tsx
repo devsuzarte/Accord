@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import './Avatar.css'
 
 /**
@@ -6,7 +7,7 @@ import './Avatar.css'
  */
 const fallbackColors = ['#5865f2', '#eb459e', '#e67e22', '#00a8fc', '#9b59b6', '#607d8b']
 
-function colorFor(seed: string): string {
+export function colorFor(seed: string): string {
   let hash = 0
   for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) | 0
   return fallbackColors[Math.abs(hash) % fallbackColors.length]!
@@ -26,14 +27,17 @@ export interface AvatarProps {
 }
 
 export function Avatar({ id, name, src, size = 32, speaking = false }: AvatarProps) {
+  // Foto que não carrega (ex.: servidor antigo depois de trocar de host) vira as iniciais.
+  const [failed, setFailed] = useState<string | null>(null)
+  const show = src && failed !== src
   return (
     <span
       className="ss-avatar"
       data-speaking={speaking || undefined}
       style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
     >
-      {src ? (
-        <img src={src} alt="" draggable={false} />
+      {show ? (
+        <img src={src} alt="" draggable={false} onError={() => setFailed(src)} />
       ) : (
         <span
           className="ss-avatar__fallback"

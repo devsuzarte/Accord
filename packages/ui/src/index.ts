@@ -1,4 +1,4 @@
-export { Avatar } from './components/Avatar'
+export { Avatar, colorFor } from './components/Avatar'
 export type { AvatarProps } from './components/Avatar'
 export { IconButton } from './components/IconButton'
 export type { IconButtonProps } from './components/IconButton'

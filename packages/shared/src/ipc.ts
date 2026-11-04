@@ -19,6 +19,10 @@ export const IpcChannel = {
   PanelClose: 'panel:close',
   PanelResize: 'panel:resize',
   PanelHold: 'panel:hold',
+  UpdateGetState: 'update:get-state',
+  UpdateCheck: 'update:check',
+  UpdateInstall: 'update:install',
+  UpdateStateChanged: 'update:state-changed',
   /** main → painel: qual aba abrir. */
   PanelOpenTab: 'panel:open-tab',
 
@@ -80,6 +84,20 @@ export const IpcChannel = {
   HostStart: 'host:start',
   HostStop: 'host:stop',
   HostStateChanged: 'host:state-changed',
+  HostSetPassword: 'host:set-password',
+  ChatReport: 'chat:report',
+  ChatGetState: 'chat:get-state',
+  ChatStateChanged: 'chat:state-changed',
+  ChatToggle: 'chat:toggle',
+  ChatSetMode: 'chat:set-mode',
+  ChatModeChanged: 'chat:mode-changed',
+  ChatResize: 'chat:resize',
+  ChatGetPrefs: 'chat:get-prefs',
+  ChatSetPrefs: 'chat:set-prefs',
+  ChatPrefsChanged: 'chat:prefs-changed',
+  ChatUnreadChanged: 'chat:unread-changed',
+  SessionMirror: 'session:mirror',
+  SessionSaveMessages: 'session:save-messages',
 } as const
 
 export type IpcChannel = (typeof IpcChannel)[keyof typeof IpcChannel]
@@ -123,4 +141,12 @@ export interface HotkeyInfo {
   id: 'toggle-overlay' | 'toggle-ghost'
   accelerator: string
   registered: boolean
+}
+
+/** Como a janela de chat aparece: aberta (com o campo de texto) ou mínima (só as mensagens rolando). */
+export type ChatMode = 'expanded' | 'mini'
+
+export interface ChatPrefs {
+  /** Mostrar as mensagens rolando na tela (modo mínimo) durante a chamada. */
+  overlay: boolean
 }

@@ -86,7 +86,11 @@ O que já existe:
 - **Painel:** Canais (**Entrar** com a lista de canais encontrados e endereço manual, **Hospedar** pelo próprio app, **Guia**; seção Áudio recolhível), **Você** (nome, foto com recorte e zoom, GIF continua animado, e idioma), **Aparência** (6 paletas, 8 cores, imagem de fundo) e Overlay. Painel mais largo (360 px).
 - **Idiomas:** português e inglês, em todas as janelas, na bandeja e nas mensagens do servidor. Na primeira vez, segue o idioma do sistema.
 - **Tela:** seletor (telas/aplicativos, sem guias de navegador), 4 qualidades (até 1080p a 60 fps), selo AO VIVO, viewer sob demanda (conexão própria e invisível), som da transmissão capturado nativamente no Windows: tela inteira = tudo menos a chamada; aplicativo = só o som dele.
-- **Entrega:** pacote do servidor de um clique, instalador, logs e diagnóstico.
+- **Chat temporário:** botão no pill. Aberto: mensagens, imagens (clique para ampliar), arquivos e o campo com anexar/enviar (também arrastar e colar). Minimizado: as mensagens rolam perto do pill, como num chat de live (imagens viram "abra o chat para ver"); dá para desligar em Overlay. Fica só no servidor de quem hospeda e some quando a sessão acaba.
+- **Senha do canal:** quem hospeda define (ou troca com o canal aberto); os canais com senha aparecem com cadeado na lista.
+- **Troca de host:** se o PC de quem hospeda cair, a sessão passa para quem entrou primeiro, que abre o próprio servidor com a cópia da sessão (senha, chat, anexos, silêncios); os outros reconectam no IP dele sozinhos.
+- **Volume por pessoa:** 0% a 200%, só para você, no clique direito da lista de pessoas.
+- **Entrega:** pacote do servidor de um clique, instalador, **atualização automática** pelo GitHub Releases ([12](docs/12-publicar-versao.md)), logs e diagnóstico.
 
 Fora por enquanto: contas e vários canais (M3), convites e assistente de conexão (M4), atualização automática (precisa de um repositório no GitHub). Para revisar o visual com **participantes de exemplo**, crie `apps/desktop/.env.development.local` com `VITE_OVERLAY_DEMO=1`.
 
@@ -101,8 +105,9 @@ Fora por enquanto: contas e vários canais (M3), convites e assistente de conex�
 7. [Pesquisa com usuários](docs/07-pesquisa-usuarios.md) — plano, roteiro de entrevista, teste de usabilidade do overlay
 8. [Referências](docs/08-referencias.md) — fontes verificadas
 9. [Estudo do overlay (OpenCluely)](docs/09-estudo-overlay-opencluely.md) — técnicas de janela, o que levamos/adaptamos/descartamos, arquitetura overlay-first e direção de design
-10. [Próximos passos](docs/10-proximos-passos.md) — marcos M1–M8 até o app funcionando
+10. [Próximos passos](docs/10-proximos-passos.md) — marcos M1–M9 até o app funcionando
 11. [Pesquisa: supressão de ruído e login com Discord](docs/11-pesquisa-ruido-e-discord.md) — opções avaliadas e recomendação
+12. [Publicar uma versão](docs/12-publicar-versao.md) — passo a passo da release e da atualização automática
 
 ## Legenda usada nos documentos
 
@@ -113,3 +118,7 @@ Fora por enquanto: contas e vários canais (M3), convites e assistente de conex�
 ## Próximo passo
 
 Testar no Windows (voz, tela com som, instalador e servidor) e seguir a lista de validação em [10-proximos-passos](docs/10-proximos-passos.md#validação-no-windows-o-que-só-dá-para-confirmar-aí).
+
+## Licença
+
+MIT — veja [LICENSE](LICENSE). O instalador também leva programas de terceiros (LiveKit, Electron, RNNoise e outros), cada um com a sua licença: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

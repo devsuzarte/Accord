@@ -16,6 +16,7 @@ export type SoundName =
   | 'user-leave'
   | 'share-start'
   | 'share-stop'
+  | 'message'
 
 interface Note {
   /** Frequência em Hz. */
@@ -77,6 +78,10 @@ const sounds: Record<SoundName, Note[]> = {
   'share-start': [
     { f: G5, at: 0, len: 0.06, type: 'triangle' },
     { f: B5, at: 0.05, len: 0.12, type: 'triangle' },
+  ],
+  message: [
+    { f: 880, at: 0, len: 0.05 },
+    { f: 1174.66, at: 0.045, len: 0.08 },
   ],
   'share-stop': [
     { f: B5, at: 0, len: 0.06, type: 'triangle' },

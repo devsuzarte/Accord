@@ -2,6 +2,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import { IpcChannel, SHARE_AUDIO_PORT_MESSAGE } from '@sharescreen/shared'
+import type { ChatMode, ChatPrefs } from '@sharescreen/shared'
 import type {
   CallCommand,
   CallSnapshot,
@@ -13,6 +14,8 @@ import type {
   Profile,
   ShareRequest,
   Theme,
+  UpdateState,
+  ChatState,
 } from '@sharescreen/shared'
 
 /** Assina um canal main → renderer e devolve a função de cancelar. */
@@ -95,9 +98,33 @@ const platform: PlatformBridge = {
   },
   host: {
     getState: () => ipcRenderer.invoke(IpcChannel.HostGetState),
-    start: () => ipcRenderer.send(IpcChannel.HostStart),
+    start: (options) => ipcRenderer.invoke(IpcChannel.HostStart, options),
+    setPassword: (password) => ipcRenderer.invoke(IpcChannel.HostSetPassword, password),
     stop: () => ipcRenderer.send(IpcChannel.HostStop),
     onChange: (listener) => subscribe<HostState>(IpcChannel.HostStateChanged, listener),
+  },
+  update: {
+    getState: () => ipcRenderer.invoke(IpcChannel.UpdateGetState),
+    check: () => ipcRenderer.send(IpcChannel.UpdateCheck),
+    install: () => ipcRenderer.send(IpcChannel.UpdateInstall),
+    onChange: (listener) => subscribe<UpdateState>(IpcChannel.UpdateStateChanged, listener),
+  },
+  chat: {
+    report: (state) => ipcRenderer.send(IpcChannel.ChatReport, state),
+    getState: () => ipcRenderer.invoke(IpcChannel.ChatGetState),
+    onState: (listener) => subscribe<ChatState>(IpcChannel.ChatStateChanged, listener),
+    toggle: () => ipcRenderer.send(IpcChannel.ChatToggle),
+    setMode: (mode) => ipcRenderer.send(IpcChannel.ChatSetMode, mode),
+    onMode: (listener) => subscribe<ChatMode>(IpcChannel.ChatModeChanged, listener),
+    resize: (size) => ipcRenderer.send(IpcChannel.ChatResize, size),
+    getPrefs: () => ipcRenderer.invoke(IpcChannel.ChatGetPrefs),
+    setPrefs: (prefs) => ipcRenderer.send(IpcChannel.ChatSetPrefs, prefs),
+    onPrefs: (listener) => subscribe<ChatPrefs>(IpcChannel.ChatPrefsChanged, listener),
+    onUnread: (listener) => subscribe<number>(IpcChannel.ChatUnreadChanged, listener),
+  },
+  session: {
+    mirror: (request) => ipcRenderer.send(IpcChannel.SessionMirror, request),
+    saveMessages: (messages) => ipcRenderer.invoke(IpcChannel.SessionSaveMessages, messages),
   },
 }
 

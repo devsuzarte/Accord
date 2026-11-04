@@ -3,6 +3,9 @@ import type { IpcMainEvent } from 'electron'
 import { IpcChannel } from '@sharescreen/shared'
 import type {
   AppInfo,
+  ChatMessage,
+  ChatState,
+  SessionMirrorRequest,
   CallCommand,
   CallSnapshot,
   OverlayCorner,
@@ -17,6 +20,9 @@ import type { DiscoveryService } from './network/discovery'
 import type { HostService } from './network/host-service'
 import type { PeopleWindow } from './overlay/people-window'
 import type { SettingsStore } from './settings/settings-store'
+import type { Updater } from './updater'
+import type { ChatWindow } from './overlay/chat-window'
+import type { SessionMirror } from './network/session-mirror'
 import type { ShareService } from './share/share-service'
 import type { ViewerManager } from './share/viewer-manager'
 import type { OverlayManager } from './overlay/overlay-manager'
@@ -60,6 +66,15 @@ function isCallCommand(value: unknown): value is CallCommand {
       moderationActions.includes(v.action) && typeof v.target === 'string' && v.target.length < 128
     )
   }
+  if (v.type === 'set-volume') {
+    return (
+      typeof v.name === 'string' &&
+      v.name.length <= 32 &&
+      typeof v.volume === 'number' &&
+      v.volume >= 0 &&
+      v.volume <= 2
+    )
+  }
   if (v.type === 'watch') return typeof v.identity === 'string' && v.identity.length < 128
   return (
     v.type === 'join' &&
@@ -67,7 +82,8 @@ function isCallCommand(value: unknown): value is CallCommand {
     v.name.trim().length > 0 &&
     v.name.length <= 32 &&
     typeof v.serverUrl === 'string' &&
-    /^https?:\/\//.test(v.serverUrl)
+    /^https?:\/\//.test(v.serverUrl) &&
+    (v.password === undefined || v.password === null || typeof v.password === 'string')
   )
 }
 
@@ -111,7 +127,8 @@ function isViewerTarget(value: unknown): value is ViewerTarget {
     typeof v.identity === 'string' &&
     typeof v.name === 'string' &&
     typeof v.serverUrl === 'string' &&
-    /^https?:\/\//.test(v.serverUrl)
+    /^https?:\/\//.test(v.serverUrl) &&
+    (v.password === undefined || v.password === null || typeof v.password === 'string')
   )
 }
 
@@ -125,6 +142,9 @@ export interface IpcDependencies {
   settings: SettingsStore
   discovery: DiscoveryService
   host: HostService
+  updater: Updater
+  chat: ChatWindow
+  mirror: SessionMirror
 }
 
 const moderationActions = [
@@ -146,6 +166,9 @@ export function registerIpcHandlers({
   settings,
   discovery,
   host,
+  updater,
+  chat,
+  mirror,
 }: IpcDependencies): void {
   type Sender = Pick<IpcMainEvent, 'sender'>
   const fromPill = (event: Sender) => overlay.isPill(event.sender.id)
@@ -210,8 +233,18 @@ export function registerIpcHandlers({
     return discovery.probe(address)
   })
   ipcMain.handle(IpcChannel.HostGetState, () => host.refresh())
-  ipcMain.on(IpcChannel.HostStart, (event) => {
-    if (fromPanel(event)) void host.start()
+  ipcMain.handle(IpcChannel.HostStart, async (event, options: unknown) => {
+    if (!fromPanel(event) && !fromPill(event)) return host.getState()
+    const o = (options ?? {}) as { password?: unknown; restore?: unknown }
+    return host.start({
+      password: typeof o.password === 'string' ? o.password.slice(0, 64) : null,
+      restore: o.restore === true,
+    })
+  })
+  ipcMain.handle(IpcChannel.HostSetPassword, (event, password: unknown) => {
+    if (!fromPanel(event)) return false
+    if (password !== null && (typeof password !== 'string' || password.length > 64)) return false
+    return host.setPassword(password)
   })
   ipcMain.on(IpcChannel.HostStop, (event) => {
     if (fromPanel(event)) host.stop()
@@ -284,5 +317,56 @@ export function registerIpcHandlers({
   ipcMain.handle(IpcChannel.ThemeGet, () => settings.getTheme())
   ipcMain.on(IpcChannel.ThemeSet, (event, theme: unknown) => {
     if (fromPanel(event)) settings.setTheme(theme)
+  })
+
+  // Atualização automática.
+  ipcMain.handle(IpcChannel.UpdateGetState, () => updater.getState())
+  ipcMain.on(IpcChannel.UpdateCheck, () => updater.check())
+  ipcMain.on(IpcChannel.UpdateInstall, (event) => {
+    if (fromPanel(event)) updater.install()
+  })
+
+  // Chat (as mensagens vivem no pill; a janela de chat mostra e envia direto ao servidor).
+  ipcMain.on(IpcChannel.ChatReport, (event, state: unknown) => {
+    const v = state as ChatState
+    if (fromPill(event) && v && Array.isArray(v.messages)) chat.report(v)
+  })
+  ipcMain.handle(IpcChannel.ChatGetState, () => chat.getState())
+  ipcMain.on(IpcChannel.ChatToggle, (event) => {
+    if (fromPill(event) || fromPanel(event) || people.is(event.sender.id)) chat.toggle()
+  })
+  ipcMain.on(IpcChannel.ChatSetMode, (event, mode: unknown) => {
+    if (mode === 'expanded' || mode === 'mini') chat.setMode(mode)
+  })
+  ipcMain.on(IpcChannel.ChatResize, (event, size: unknown) => {
+    if (chat.is(event.sender.id) && isSize(size)) chat.resizeMini(size)
+  })
+  ipcMain.handle(IpcChannel.ChatGetPrefs, () => chat.getPrefs())
+  ipcMain.on(IpcChannel.ChatSetPrefs, (event, prefs: unknown) => {
+    const v = prefs as { overlay?: unknown }
+    if (fromPanel(event) && typeof v?.overlay === 'boolean') chat.setPrefs({ overlay: v.overlay })
+  })
+
+  // Cópia da sessão para a migração de host.
+  ipcMain.on(IpcChannel.SessionMirror, (event, request: unknown) => {
+    if (!fromPill(event)) return
+    const v = request as SessionMirrorRequest | null
+    if (v === null) return mirror.set(null)
+    if (
+      typeof v?.serverUrl === 'string' &&
+      /^https?:\/\//.test(v.serverUrl) &&
+      typeof v.token === 'string' &&
+      typeof v.files === 'boolean'
+    ) {
+      mirror.set({
+        serverUrl: v.serverUrl,
+        token: v.token,
+        password: typeof v.password === 'string' ? v.password : null,
+        files: v.files,
+      })
+    }
+  })
+  ipcMain.handle(IpcChannel.SessionSaveMessages, (event, messages: unknown) => {
+    if (fromPill(event) && Array.isArray(messages)) mirror.saveMessages(messages as ChatMessage[])
   })
 }

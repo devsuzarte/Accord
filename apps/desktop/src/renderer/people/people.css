@@ -284,3 +284,61 @@
   background: #fff;
   color: var(--brand);
 }
+
+/* ── Volume por pessoa (0–200%, só para você) ────────── */
+
+.menu__volume {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 8px 10px;
+  color: var(--interactive);
+}
+
+.menu__volume-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.menu__volume-value {
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+}
+
+.menu__volume-value:hover {
+  background: var(--material-raised-hover);
+}
+
+/* Trilha preenchida até o valor; a marca do meio (100%) fica visível. */
+.menu__slider {
+  width: 100%;
+  height: 6px;
+  margin: 0;
+  appearance: none;
+  border-radius: var(--radius-pill);
+  background:
+    linear-gradient(var(--text-muted), var(--text-muted)) 50% 50% / 2px 10px no-repeat,
+    linear-gradient(to right, var(--brand) var(--fill), var(--bg-modifier-selected) var(--fill));
+  cursor: pointer;
+}
+
+.menu__slider::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  appearance: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.person__volume {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}

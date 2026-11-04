@@ -6,6 +6,7 @@ import { infoRoutes } from './routes/info'
 import { avatarRoutes } from './routes/avatars'
 import { joinRoutes } from './routes/join'
 import { moderateRoutes } from './routes/moderate'
+import { sessionRoutes } from './routes/session'
 
 /**
  * Montagem da aplicação. Contas, vários canais e convites entram no M3/M4
@@ -19,6 +20,8 @@ const base = new Elysia()
   .use(healthRoutes)
   .use(infoRoutes)
 
-export const app = env.openJoin ? base.use(joinRoutes).use(avatarRoutes).use(moderateRoutes) : base
+export const app = env.openJoin
+  ? base.use(joinRoutes).use(avatarRoutes).use(moderateRoutes).use(sessionRoutes)
+  : base
 
 export type App = typeof app

@@ -2,7 +2,7 @@
   "name": "@sharescreen/desktop",
   "productName": "Accord",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Accord — voz e compartilhamento de tela em overlay",
   "author": "devsuzarte",
   "main": "./out/main/index.js",
@@ -15,6 +15,7 @@
     "dev:second": "bun scripts/second-instance.ts"
   },
   "dependencies": {
+    "electron-updater": "6.8.11",
     "koffi": "3.3.6",
     "loopback-capture": "4.0.0"
   },

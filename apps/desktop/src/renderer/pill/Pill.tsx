@@ -15,6 +15,7 @@ import {
   PhoneOff,
   Plus,
   Settings2,
+  MessageSquare,
   Users,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -129,6 +130,7 @@ const useCall = demoEnabled ? useDemoCall : useRealCall
 
 export function Pill() {
   const spineDrag = useSpineDrag()
+  const unread = useChatUnread()
   const t = useT()
   const overlay = useOverlayState()
   const call = useCall()
@@ -285,6 +287,21 @@ export function Pill() {
                   <span className="controls__spacer" />
                   <span className="people-button">
                     <IconButton
+                      label={unread ? t('pill.chatUnread', { n: unread }) : t('pill.chat')}
+                      icon={<MessageSquare size={18} />}
+                      onClick={() => window.platform.chat.toggle()}
+                    />
+                    {unread > 0 && (
+                      <span
+                        className="people-button__count people-button__count--alert"
+                        aria-hidden
+                      >
+                        {unread > 9 ? '9+' : unread}
+                      </span>
+                    )}
+                  </span>
+                  <span className="people-button">
+                    <IconButton
                       label={
                         someoneLive
                           ? t('pill.peopleLive', { n: participants.length })
@@ -330,4 +347,11 @@ export function Pill() {
       </div>
     </div>
   )
+}
+
+/** Mensagens novas no chat desde a última vez que ele foi aberto. */
+function useChatUnread(): number {
+  const [count, setCount] = useState(0)
+  useEffect(() => window.platform.chat.onUnread(setCount), [])
+  return count
 }

@@ -7,6 +7,7 @@ import { useLanguage, useT } from '../shared/i18n'
 import { IMAGE_ACCEPT } from '../shared/images'
 import { AvatarCropper } from './AvatarCropper'
 import { openFilePicker } from '../shared/filePicker'
+import { UpdateSection } from './UpdateSection'
 
 const accepted = IMAGE_ACCEPT.split(',')
 
@@ -146,6 +147,7 @@ export function ProfileTab({ profile, inCall }: { profile: Profile; inCall: bool
       </label>
 
       <div className="section">
+        <UpdateSection />
         {info && (
           <p className="hint hint--flush">
             {t('profile.version', { version: info.version, electron: info.electron })}

@@ -1,11 +1,18 @@
+import { PASSWORD_HEADER } from '@sharescreen/shared'
 import { Elysia, t } from 'elysia'
 import { MAX_AVATAR_BYTES, readAvatar, saveAvatar } from '../services/avatars'
+import { checkPassword } from '../services/session'
 
 /** Fotos de perfil: o app envia ao entrar (ou ao trocar), os outros baixam pelo caminho. */
 export const avatarRoutes = new Elysia()
   .post(
     '/avatar',
-    ({ body, set }) => {
+    ({ body, headers, set }) => {
+      const passwordError = checkPassword(headers[PASSWORD_HEADER])
+      if (passwordError) {
+        set.status = 401
+        return { error: passwordError }
+      }
       try {
         return { path: saveAvatar(body.data) }
       } catch (error) {

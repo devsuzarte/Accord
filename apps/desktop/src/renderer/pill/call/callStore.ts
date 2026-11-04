@@ -8,6 +8,7 @@ import type {
   Role,
   ShareRequest,
 } from '@sharescreen/shared'
+import { normalizeServerUrl, PASSWORD_HEADER } from '@sharescreen/shared'
 import { DisconnectReason, Room, RoomEvent, Track } from 'livekit-client'
 import type {
   LocalAudioTrack,
@@ -19,8 +20,20 @@ import type {
 } from 'livekit-client'
 import { create } from 'zustand'
 import { isLocallyMuted, readLocalMutes, setLocalMute } from '../../shared/localMutes'
+import { readVolumes, setVolume as saveVolume, volumeOf } from '../../shared/localVolumes'
 import type { LocalMutes } from '../../shared/localMutes'
 import { t } from '../../shared/i18n'
+import {
+  chatMessages,
+  endChat,
+  handleChatData,
+  onChatChange,
+  refreshHistory,
+  startChat,
+  suspendChat,
+} from './chat'
+import { serverAlive, successionOf, waitForServer } from './migration'
+import type { Successor } from './migration'
 import { noiseContext, RnnoiseProcessor } from './noise'
 import { startScreenShare } from './screenShare'
 import type { ActiveShare } from './screenShare'
@@ -32,7 +45,7 @@ import type { SoundName } from './sounds'
  * (backgroundThrottling desligado) — docs/02-arquitetura.md › Renderer.
  */
 interface CallActions {
-  join(name: string, serverUrl: string): Promise<void>
+  join(name: string, serverUrl: string, password?: string | null): Promise<void>
   leave(): Promise<void>
   toggleMic(): Promise<void>
   toggleDeafen(): Promise<void>
@@ -46,6 +59,8 @@ interface CallActions {
   setSounds(enabled: boolean): void
   /** "Mutar para mim": só neste computador, guardado pelo nome da pessoa. */
   localMute(name: string, kind: 'mic' | 'audio', muted: boolean): void
+  /** Volume da voz de alguém só para você (0 a 2). */
+  setVolume(name: string, volume: number): void
   /** Ações do dono/admin (o servidor confere a permissão). */
   moderate(action: ModerationAction, target: string): Promise<void>
   /** Nome ou foto mudaram na aba Você: atualiza para os outros na hora. */
@@ -63,8 +78,20 @@ let activeShare: ActiveShare | null = null
 /** Token da chamada: também identifica você nos pedidos de moderação. */
 let token = ''
 let mutes: LocalMutes = readLocalMutes()
+let volumes = readVolumes()
 /** Última foto enviada ao servidor (evita reenviar a mesma). */
 let uploaded: { data: string; path: string } | null = null
+/** Senha do canal atual (vai junto em todo pedido ao servidor). */
+let password: string | null = null
+let myName = ''
+/** Fila de quem assume se o host cair (atualizada a cada mudança na sala). */
+let succession: Successor[] = []
+let amHost = false
+let migrating = false
+let lastMirror = ''
+
+const withPassword = (headers: Record<string, string>, pw: string | null) =>
+  pw ? { ...headers, [PASSWORD_HEADER]: pw } : headers
 
 /**
  * O pill só recebe o ÁUDIO das vozes. O vídeo das transmissões (e o som delas) é recebido
@@ -130,16 +157,16 @@ function audioHost(): HTMLElement {
   return host
 }
 
-/** Ensurdecido silencia todas as vozes; "mutar para mim" silencia só a daquela pessoa. */
-function applyVoiceMutes(deafened: boolean): void {
-  audioHost()
-    .querySelectorAll('audio')
-    .forEach((el) => {
-      const who = el.dataset.identity
-        ? room?.remoteParticipants.get(el.dataset.identity)
-        : undefined
-      el.muted = deafened || (!!who && isLocallyMuted(mutes, 'mic', who.name || who.identity))
-    })
+/**
+ * Volume de cada voz (as vozes tocam pelo WebAudio, com ganho por pessoa):
+ * ensurdecido = 0 para todos; "mutar para mim" = 0; senão o volume escolhido (0 a 200%).
+ */
+function applyVoiceVolumes(deafened: boolean): void {
+  room?.remoteParticipants.forEach((p) => {
+    const name = p.name || p.identity
+    const volume = deafened || isLocallyMuted(mutes, 'mic', name) ? 0 : volumeOf(volumes, name)
+    p.setVolume(volume, Track.Source.Microphone)
+  })
 }
 
 const moderationErrors = [
@@ -167,7 +194,7 @@ async function uploadAvatar(data: string | null, base: string): Promise<string> 
   try {
     const response = await fetch(`${base}/avatar`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: withPassword({ 'content-type': 'application/json' }, password),
       body: JSON.stringify({ data }),
     })
     if (!response.ok) throw new Error(String(response.status))
@@ -212,12 +239,6 @@ async function applyNoise(mode: AudioState['noiseSuppression']): Promise<void> {
   }
 }
 
-/** Saída de som escolhida também nos <audio> que já existem. */
-function applySink(el: HTMLMediaElement, deviceId: string): void {
-  const media = el as HTMLMediaElement & { setSinkId?: (id: string) => Promise<void> }
-  void media.setSinkId?.(deviceId || 'default').catch(() => undefined)
-}
-
 function toState(p: Participant, isLocal: boolean, deafened: boolean): ParticipantState {
   const mic = p.getTrackPublication(Track.Source.Microphone)
   const name = p.name || p.identity
@@ -230,6 +251,7 @@ function toState(p: Participant, isLocal: boolean, deafened: boolean): Participa
     serverAudioBlocked: p.attributes.serverAudio === 'blocked',
     localMicMuted: !isLocal && isLocallyMuted(mutes, 'mic', name),
     localAudioMuted: !isLocal && isLocallyMuted(mutes, 'audio', name),
+    volume: isLocal ? 1 : volumeOf(volumes, name),
     displayName: name,
     avatarUrl: p.attributes.avatar ? `${serverUrl}${p.attributes.avatar}` : null,
     speaking: p.isSpeaking,
@@ -255,13 +277,16 @@ async function requestToken(name: string, base: string, avatar: string): Promise
   try {
     response = await fetch(`${base}/join`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: withPassword({ 'content-type': 'application/json' }, password),
       body: JSON.stringify({ name, ...(avatar ? { avatar } : {}) }),
     })
   } catch {
     throw new Error(t('call.err.serverUnreachable', { url: base }))
   }
   if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null
+    if (body?.error === 'password-required') throw new Error(t('call.err.passwordRequired'))
+    if (body?.error === 'wrong-password') throw new Error(t('call.err.wrongPassword'))
     throw new Error(t('call.err.joinRefused', { status: response.status }))
   }
   return (await response.json()) as JoinResponse
@@ -270,8 +295,35 @@ async function requestToken(name: string, base: string, avatar: string): Promise
 export const useCallStore = create<CallStore>((set, get) => {
   const refresh = () => {
     if (!room) return
-    applyVoiceMutes(get().audio.deafened)
+    applyVoiceVolumes(get().audio.deafened)
     set({ participants: participantsOf(room, get().audio.deafened) })
+    updateSuccession(room)
+  }
+
+  /**
+   * Fila de migração e cópia da sessão: quem não é o host guarda uma cópia (senha, chat);
+   * os dois primeiros da fila guardam também os anexos.
+   */
+  const updateSuccession = (r: Room) => {
+    succession = successionOf(r)
+    amHost = r.localParticipant.attributes.role === 'owner'
+    const position = succession.findIndex((s) => s.identity === r.localParticipant.identity)
+    const request =
+      amHost || position < 0 || !token ? null : { serverUrl, token, password, files: position < 2 }
+    const key = JSON.stringify(request)
+    if (key !== lastMirror) {
+      lastMirror = key
+      window.platform.session.mirror(request)
+    }
+  }
+
+  /** Larga a sala atual (sem mexer no chat). */
+  const dropRoom = () => {
+    void activeShare?.stop()
+    activeShare = null
+    audioHost().replaceChildren()
+    room = null
+    token = ''
   }
 
   const sound = (name: SoundName) => {
@@ -285,11 +337,11 @@ export const useCallStore = create<CallStore>((set, get) => {
   }
 
   const reset = (error: string | null) => {
-    void activeShare?.stop()
-    activeShare = null
-    audioHost().replaceChildren()
-    room = null
-    token = ''
+    dropRoom()
+    migrating = false
+    endChat()
+    lastMirror = ''
+    window.platform.session.mirror(null)
     if (error) log(`saiu do canal: ${error}`)
     set({ status: 'idle', sharing: null, channelName: null, participants: [], error })
   }
@@ -361,8 +413,7 @@ export const useCallStore = create<CallStore>((set, get) => {
           const el = track.attach()
           el.dataset.sid = track.sid ?? ''
           el.dataset.identity = participant.identity
-          el.muted = get().audio.deafened
-          if (get().audio.outputDeviceId) applySink(el, get().audio.outputDeviceId)
+          // O LiveKit deixa o <audio> mudo e toca pelo WebAudio (webAudioMix).
           audioHost().append(el)
           refresh()
         },
@@ -377,20 +428,178 @@ export const useCallStore = create<CallStore>((set, get) => {
       })
       .on(RoomEvent.Reconnected, () => {
         log('reconectado')
+        void refreshHistory()
         set({ status: 'connected', error: null })
         refresh()
       })
+      .on(
+        RoomEvent.DataReceived,
+        (payload: Uint8Array, participant?: RemoteParticipant, _kind?: unknown, topic?: string) =>
+          handleChatData(payload, !!participant, topic),
+      )
       .on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
-        if (leavingOnPurpose) return reset(null)
-        sound('leave')
-        const message =
-          reason === DisconnectReason.DUPLICATE_IDENTITY
-            ? t('call.err.duplicate')
-            : reason === DisconnectReason.PARTICIPANT_REMOVED
-              ? t('call.err.kicked')
-              : t('call.err.dropped')
-        reset(message)
+        if (leavingOnPurpose || room !== r) return reset(null)
+        if (
+          reason === DisconnectReason.DUPLICATE_IDENTITY ||
+          reason === DisconnectReason.PARTICIPANT_REMOVED
+        ) {
+          sound('leave')
+          return reset(
+            reason === DisconnectReason.DUPLICATE_IDENTITY
+              ? t('call.err.duplicate')
+              : t('call.err.kicked'),
+          )
+        }
+        void migrate()
       })
+  }
+
+  // Mensagem nova de outra pessoa: um "tic" baixinho (só o histórico ao entrar não toca).
+  let heard = 0
+  onChatChange(() => {
+    const list = chatMessages()
+    const fresh = list.slice(heard)
+    heard = list.length
+    const me = room?.localParticipant.identity
+    if (fresh.length > 0 && fresh.length <= 3 && fresh.some((m) => m.identity !== me)) {
+      if (get().audio.sounds) playSound('message', 0.09)
+    }
+  })
+
+  /** Entra num servidor (usado ao entrar e ao seguir o host novo na migração). */
+  const connect = async (name: string, joinUrl: string, joinPassword: string | null) => {
+    const base = joinUrl.replace(/\/$/, '')
+    password = joinPassword?.trim() || null
+    myName = name
+    log(`entrando em ${base}`)
+    const profile = await window.platform.profile.get().catch(() => null)
+    const avatar = await uploadAvatar(profile?.avatar ?? null, base)
+    const access = await requestToken(name, base, avatar)
+    const audio = get().audio
+    const r = new Room({
+      adaptiveStream: true,
+      dynacast: true,
+      audioCaptureDefaults: {
+        deviceId: audio.inputDeviceId || undefined,
+        echoCancellation: true,
+        // Com RNNoise ligado, o filtro do Chromium fica desligado (um supressor só).
+        noiseSuppression: audio.noiseSuppression === 'standard',
+        autoGainControl: true,
+      },
+      audioOutput: audio.outputDeviceId ? { deviceId: audio.outputDeviceId } : undefined,
+      // Vozes pelo WebAudio: permite volume por pessoa acima de 100%.
+      webAudioMix: true,
+    })
+    wire(r)
+    try {
+      await r.connect(access.livekitUrl, access.token, { autoSubscribe: false })
+    } catch {
+      throw new Error(t('call.err.voiceUnreachable', { url: access.livekitUrl }))
+    }
+    room = r
+    serverUrl = base
+    token = access.token
+    leavingOnPurpose = false
+    r.remoteParticipants.forEach(subscribeVoices)
+    if (audio.outputDeviceId) {
+      await r.switchActiveDevice('audiooutput', audio.outputDeviceId).catch(() => undefined)
+    }
+    set({ status: 'connected', channelName: access.channelName, error: null })
+    sound('join')
+    log(`conectado em ${access.livekitUrl} como ${access.role}`)
+
+    // Endereços deste PC: se o host cair e for a minha vez, os outros me acham por eles.
+    const host = await window.platform.host.getState().catch(() => null)
+    const addrs = host?.addresses.map((a) => a.address).join(',') ?? ''
+    await r.localParticipant.setAttributes({ addrs }).catch(() => undefined)
+    await startChat(base, access.token, password, access.identity, access.channelName)
+    refresh()
+
+    // Entra respeitando o que a pessoa escolheu antes: mudo e/ou ensurdecido.
+    if (audio.deafened) {
+      micBeforeDeafen = !audio.micMuted
+      await r.localParticipant.setAttributes({ deafened: '1' }).catch(() => undefined)
+    }
+    try {
+      if (!audio.micMuted && !audio.deafened) {
+        await r.localParticipant.setMicrophoneEnabled(true)
+      }
+    } catch {
+      set({ error: t('call.err.micOnJoin') })
+    }
+    refresh()
+  }
+
+  /**
+   * A conexão caiu sem a pessoa pedir. Se o host ainda responde, só reconecta. Se não,
+   * a sessão passa para o primeiro da fila (quem entrou antes): se for eu, abro o meu
+   * servidor com a cópia da sessão; senão, espero o servidor dele aparecer e entro lá.
+   */
+  const migrate = async () => {
+    const previous = {
+      base: serverUrl,
+      name: myName,
+      password,
+      plan: succession,
+      me: room?.localParticipant.identity ?? '',
+      wasHost: amHost,
+    }
+    dropRoom()
+    suspendChat()
+    migrating = true
+    set({
+      status: 'reconnecting',
+      participants: [],
+      sharing: null,
+      error: t('call.migrating.check'),
+    })
+    log('a conexão caiu; conferindo se o host ainda está lá')
+    const cancelled = () => !migrating
+    try {
+      if (previous.wasHost || (await serverAlive(previous.base))) {
+        await connect(previous.name, previous.base, previous.password)
+        return
+      }
+      log(`host sumiu; fila: ${previous.plan.map((s) => s.name).join(', ') || '(vazia)'}`)
+      for (const [index, next] of previous.plan.entries()) {
+        if (cancelled()) return
+        try {
+          if (next.identity === previous.me) {
+            set({ error: t('call.migrating.you') })
+            await window.platform.session.saveMessages(chatMessages())
+            const state = await window.platform.host.start({
+              password: previous.password,
+              restore: true,
+            })
+            if (state.status !== 'running' && state.status !== 'external') continue
+            log('agora este PC hospeda a sessão')
+            await connect(previous.name, normalizeServerUrl(state.url), previous.password)
+            return
+          }
+          if (next.addresses.length === 0) continue
+          set({ error: t('call.migrating.to', { name: next.name }) })
+          const url = await waitForServer(
+            next.addresses,
+            previous.base,
+            index === 0 ? 30_000 : 25_000,
+            cancelled,
+          )
+          if (!url || cancelled()) continue
+          log(`seguindo o host novo em ${url}`)
+          await connect(previous.name, url, previous.password)
+          return
+        } catch (error) {
+          log(`migração para ${next.name} falhou: ${error}`)
+        }
+      }
+      throw new Error(t('call.err.hostGone'))
+    } catch (error) {
+      if (cancelled()) return
+      sound('leave')
+      reset(error instanceof Error ? error.message : t('call.err.dropped'))
+    } finally {
+      migrating = false
+    }
   }
 
   return {
@@ -401,65 +610,21 @@ export const useCallStore = create<CallStore>((set, get) => {
     participants: [],
     error: null,
 
-    async join(name, joinUrl) {
+    async join(name, joinUrl, joinPassword) {
       if (get().status !== 'idle') return
       set({ status: 'connecting', error: null })
       try {
-        const base = joinUrl.replace(/\/$/, '')
-        log(`entrando em ${base}`)
-        const profile = await window.platform.profile.get().catch(() => null)
-        const avatar = await uploadAvatar(profile?.avatar ?? null, base)
-        const access = await requestToken(name, base, avatar)
-        const audio = get().audio
-        const r = new Room({
-          adaptiveStream: true,
-          dynacast: true,
-          audioCaptureDefaults: {
-            deviceId: audio.inputDeviceId || undefined,
-            echoCancellation: true,
-            // Com RNNoise ligado, o filtro do Chromium fica desligado (um supressor só).
-            noiseSuppression: audio.noiseSuppression === 'standard',
-            autoGainControl: true,
-          },
-          audioOutput: audio.outputDeviceId ? { deviceId: audio.outputDeviceId } : undefined,
-        })
-        wire(r)
-        try {
-          await r.connect(access.livekitUrl, access.token, { autoSubscribe: false })
-        } catch {
-          throw new Error(t('call.err.voiceUnreachable', { url: access.livekitUrl }))
-        }
-        room = r
-        serverUrl = base
-        token = access.token
-        leavingOnPurpose = false
-        r.remoteParticipants.forEach(subscribeVoices)
-        set({ status: 'connected', channelName: access.channelName })
-        sound('join')
-        log(`conectado em ${access.livekitUrl} como ${access.role}`)
-        refresh()
-
-        // Entra respeitando o que a pessoa escolheu antes: mudo e/ou ensurdecido.
-        if (audio.deafened) {
-          micBeforeDeafen = !audio.micMuted
-          await r.localParticipant.setAttributes({ deafened: '1' }).catch(() => undefined)
-        }
-        try {
-          if (!audio.micMuted && !audio.deafened) {
-            await r.localParticipant.setMicrophoneEnabled(true)
-          }
-        } catch {
-          set({
-            error: t('call.err.micOnJoin'),
-          })
-        }
-        refresh()
+        await connect(name, joinUrl, joinPassword ?? null)
       } catch (error) {
         reset(error instanceof Error ? error.message : t('call.err.joinFailed'))
       }
     },
 
     async leave() {
+      if (migrating) {
+        migrating = false
+        return reset(null)
+      }
       if (!room) return
       leavingOnPurpose = true
       sound('leave')
@@ -503,7 +668,7 @@ export const useCallStore = create<CallStore>((set, get) => {
       const micMuted = deafened ? true : !micBeforeDeafen
       setAudio({ deafened, micMuted })
       sound(deafened ? 'deafen' : 'undeafen')
-      applyVoiceMutes(deafened)
+      applyVoiceVolumes(deafened)
       if (room) {
         const blocked = room.localParticipant.attributes.serverMic === 'blocked'
         await room.localParticipant
@@ -530,9 +695,6 @@ export const useCallStore = create<CallStore>((set, get) => {
     async setOutputDevice(deviceId) {
       setAudio({ outputDeviceId: deviceId })
       setSoundsOutput(deviceId)
-      audioHost()
-        .querySelectorAll('audio')
-        .forEach((el) => applySink(el, deviceId))
       if (room) {
         await room.switchActiveDevice('audiooutput', deviceId || 'default').catch(() => undefined)
       }
@@ -602,6 +764,7 @@ export const useCallStore = create<CallStore>((set, get) => {
         identity: participant.userId,
         name: participant.displayName,
         serverUrl,
+        password,
       })
     },
 
@@ -620,6 +783,11 @@ export const useCallStore = create<CallStore>((set, get) => {
     setSounds(enabled) {
       setAudio({ sounds: enabled })
       if (enabled) playSound('mic-on')
+    },
+
+    setVolume(name, volume) {
+      volumes = saveVolume(name, volume)
+      refresh()
     },
 
     localMute(name, kind, muted) {
@@ -687,7 +855,7 @@ export function startReportingCallState(): () => void {
     const store = useCallStore.getState()
     switch (command.type) {
       case 'join':
-        return void store.join(command.name, command.serverUrl)
+        return void store.join(command.name, command.serverUrl, command.password)
       case 'leave':
         return void store.leave()
       case 'toggle-mic':
@@ -702,6 +870,8 @@ export function startReportingCallState(): () => void {
         return void store.setNoiseSuppression(command.mode)
       case 'set-sounds':
         return store.setSounds(command.enabled)
+      case 'set-volume':
+        return store.setVolume(command.name, command.volume)
       case 'local-mute':
         return store.localMute(command.name, command.kind, command.muted)
       case 'moderate':

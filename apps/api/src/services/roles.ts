@@ -61,3 +61,16 @@ export function isLoopback(address: string | undefined): boolean {
     .flat()
     .some((i) => i?.address === ip)
 }
+
+/** Bloqueios por nome, para a cópia da sessão (migração de host). */
+export function exportBlocks(): Record<string, Blocks> {
+  return Object.fromEntries(blocks)
+}
+
+export function importBlocks(saved: Record<string, Blocks>): void {
+  for (const [name, value] of Object.entries(saved)) {
+    if (typeof value?.mic === 'boolean' && typeof value?.audio === 'boolean') {
+      blocks.set(name, { mic: value.mic, audio: value.audio })
+    }
+  }
+}

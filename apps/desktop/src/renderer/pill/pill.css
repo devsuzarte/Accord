@@ -288,3 +288,8 @@
   font-weight: 500;
   line-height: 1.3;
 }
+
+.people-button__count--alert {
+  background: var(--status-red);
+  color: #fff;
+}

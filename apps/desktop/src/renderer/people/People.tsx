@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type React from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { channelLabel, t as translate, useT } from '../shared/i18n'
 import { useCallSnapshot } from '../shared/useCallSnapshot'
@@ -173,6 +174,14 @@ function PersonRow({
         {role && <span className="person__role">{t(role)}</span>}
       </span>
       <span className="person__status">
+        {!person.isLocal && person.volume !== 1 && !person.localMicMuted && (
+          <span
+            className="person__volume"
+            title={t('people.volumeBadge', { n: Math.round(person.volume * 100) })}
+          >
+            {Math.round(person.volume * 100)}%
+          </span>
+        )}
         {person.localMicMuted && (
           <VolumeX size={15} className="person__icon--local" aria-label={t('people.localMuted')} />
         )}
@@ -359,6 +368,7 @@ function PersonMenu({
       }}
     >
       <p className="menu__title">{person.displayName}</p>
+      {!person.isLocal && <VolumeSlider person={person} />}
       {groups.map((group, i) => (
         <div key={i} className="menu__group" role="group">
           {group.map((item) => {
@@ -392,6 +402,42 @@ function PersonMenu({
           })}
         </div>
       ))}
+    </div>
+  )
+}
+
+/** Volume da voz dessa pessoa só para você: 0% a 200%. */
+function VolumeSlider({ person }: { person: ParticipantState }) {
+  const t = useT()
+  const [value, setValue] = useState(Math.round(person.volume * 100))
+  const change = (percent: number) => {
+    setValue(percent)
+    send({ type: 'set-volume', name: person.displayName, volume: percent / 100 })
+  }
+  return (
+    <div className="menu__volume">
+      <span className="menu__volume-head">
+        <span className="menu__label">{t('menu.volume')}</span>
+        <button
+          type="button"
+          className="menu__volume-value"
+          title={t('menu.volumeReset')}
+          onClick={() => change(100)}
+        >
+          {value}%
+        </button>
+      </span>
+      <input
+        type="range"
+        className="menu__slider"
+        min={0}
+        max={200}
+        step={5}
+        value={value}
+        aria-label={t('menu.volume')}
+        style={{ '--fill': `${value / 2}%` } as React.CSSProperties}
+        onChange={(e) => change(Number(e.target.value))}
+      />
     </div>
   )
 }

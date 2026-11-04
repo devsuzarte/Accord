@@ -46,6 +46,8 @@ export class OverlayManager {
   /** Última posição definida por código: eventos 'move' chegam depois (assíncronos). */
   private expectedPosition: { x: number; y: number } | null = null
   private trackUserMoves = false
+  /** Outras janelas presas ao pill (chat) acompanham posição e visibilidade. */
+  private readonly listeners = new Set<() => void>()
   /** Arrasto em andamento: distância do cursor até o canto do pill. */
   private dragOffset: { x: number; y: number } | null = null
 
@@ -112,10 +114,22 @@ export class OverlayManager {
     this.expectedPosition = { x: bounds.x, y: bounds.y }
     this.pill.setBounds(bounds)
     this.positionPanel()
+    this.notify()
+  }
+
+  /** Avisa quando o pill muda de lugar, aparece ou some. */
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  private notify(): void {
+    for (const listener of this.listeners) listener()
   }
 
   private onPillMove(): void {
     this.positionPanel()
+    this.notify()
     if (!this.trackUserMoves) return
     const { x, y } = this.pill.getBounds()
     // Movimento causado por nós (resize, encaixe, restaurar) não é arrasto do usuário.
@@ -365,6 +379,17 @@ export class OverlayManager {
     this.broadcastState()
   }
 
+  /** Depois de bloqueio/suspensão: garante topo, cliques e posição do pill e do painel. */
+  refresh(): void {
+    if (this.pill.isDestroyed()) return
+    if (this.visible && !this.pill.isVisible()) this.pill.showInactive()
+    this.pill.setOpacity(this.visible ? 1 : 0)
+    this.applyMouse()
+    this.pill.setAlwaysOnTop(true, 'screen-saver')
+    if (this.panel.isVisible()) this.panel.setAlwaysOnTop(true, 'screen-saver')
+    this.restorePosition()
+  }
+
   /** Cliques no pill: atravessam no modo fantasma ou com o overlay oculto. */
   private applyMouse(): void {
     if (!this.visible) this.pill.setIgnoreMouseEvents(true)
@@ -386,6 +411,7 @@ export class OverlayManager {
   }
 
   private broadcastState(): void {
+    this.notify()
     const state = this.getState()
     for (const win of [this.pill, this.panel]) {
       if (win && !win.isDestroyed()) win.webContents.send(IpcChannel.OverlayStateChanged, state)

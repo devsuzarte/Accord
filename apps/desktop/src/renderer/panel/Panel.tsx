@@ -1,6 +1,6 @@
-import type { HotkeyInfo, OverlayCorner, PanelTab } from '@sharescreen/shared'
+import type { ChatPrefs, HotkeyInfo, OverlayCorner, PanelTab } from '@sharescreen/shared'
 import { useReportSize } from '@sharescreen/ui'
-import { Ghost, X } from 'lucide-react'
+import { Ghost, MessageSquare, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useOverlayState } from '../shared/useOverlayState'
 import { useCallSnapshot } from '../shared/useCallSnapshot'
@@ -148,6 +148,8 @@ function OverlayTab() {
         />
       </div>
 
+      <ChatOverlaySwitch />
+
       <div>
         <p className="row__title">{t('overlay.position')}</p>
         <p className="row__text">{t('overlay.positionText')}</p>
@@ -179,6 +181,35 @@ function OverlayTab() {
           ))}
         </ul>
       </div>
+    </div>
+  )
+}
+
+/** Liga/desliga as mensagens do chat rolando na tela durante a chamada. */
+function ChatOverlaySwitch() {
+  const t = useT()
+  const [prefs, setPrefs] = useState<ChatPrefs | null>(null)
+  useEffect(() => {
+    window.platform.chat.getPrefs().then(setPrefs).catch(console.error)
+    return window.platform.chat.onPrefs(setPrefs)
+  }, [])
+  if (!prefs) return null
+  return (
+    <div className="row">
+      <div>
+        <p className="row__title">
+          <MessageSquare size={15} /> {t('overlay.chatTitle')}
+        </p>
+        <p className="row__text">{t('overlay.chatText')}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={prefs.overlay}
+        aria-label={t('overlay.chatTitle')}
+        className="switch"
+        onClick={() => window.platform.chat.setPrefs({ overlay: !prefs.overlay })}
+      />
     </div>
   )
 }

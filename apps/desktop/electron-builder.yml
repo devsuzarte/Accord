@@ -16,6 +16,10 @@ asar: true
 # Botão "Hospedar": o servidor (API compilada + LiveKit) vai junto, gerado por
 # `bun run package:server` (o `bun run package` da raiz faz os dois na ordem certa).
 extraResources:
+  - from: ../../LICENSE
+    to: LICENSE.txt
+  - from: ../../THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
   - from: ../../release/accord-server
     to: server
     filter:
@@ -42,9 +46,10 @@ nsis:
 linux:
   target: dir
   icon: resources/icon.png
-# Atualização automática: precisa de um repositório no GitHub com Releases.
-publish: null
-# publish:
-#   provider: github
-#   owner: <usuario>
-#   repo: Accord
+# Atualização automática (electron-updater): o app lê o latest.yml da release mais nova.
+# O build gera latest.yml + .blockmap ao lado do instalador; anexe os três à release do GitHub.
+publish:
+  provider: github
+  owner: devsuzarte
+  repo: Accord
+  releaseType: release

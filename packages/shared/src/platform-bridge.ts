@@ -1,10 +1,23 @@
 import type { LanguageSetting, LanguageState } from './i18n'
-import type { AppInfo, HotkeyInfo, OverlayCorner, OverlayState, PanelTab, Size } from './ipc'
+import type {
+  AppInfo,
+  ChatMode,
+  ChatPrefs,
+  HotkeyInfo,
+  OverlayCorner,
+  OverlayState,
+  PanelTab,
+  Size,
+} from './ipc'
 import type {
   CallCommand,
   CallSnapshot,
   DiscoveredServer,
   HostState,
+  HostStartOptions,
+  ChatMessage,
+  ChatState,
+  SessionMirrorRequest,
   ProbeResult,
   ShareAudioResult,
   ShareKind,
@@ -12,6 +25,7 @@ import type {
   Profile,
   ShareSourceList,
   Theme,
+  UpdateState,
   ViewerTarget,
 } from './types'
 
@@ -113,9 +127,41 @@ export interface PlatformBridge {
   }
   host: {
     getState(): Promise<HostState>
-    start(): void
+    /** Abre o servidor e espera ele responder (ou falhar). */
+    start(options?: HostStartOptions): Promise<HostState>
     stop(): void
+    /** Troca a senha do canal aberto por este app (null = sem senha). */
+    setPassword(password: string | null): Promise<boolean>
     onChange(listener: (state: HostState) => void): Unsubscribe
+  }
+  update: {
+    getState(): Promise<UpdateState>
+    check(): void
+    install(): void
+    onChange(listener: (state: UpdateState) => void): Unsubscribe
+  }
+  chat: {
+    /** Pill: publica as mensagens e o acesso ao servidor. */
+    report(state: ChatState): void
+    getState(): Promise<ChatState>
+    onState(listener: (state: ChatState) => void): Unsubscribe
+    /** Abre o chat (ou volta para o modo mínimo, se já está aberto). */
+    toggle(): void
+    setMode(mode: ChatMode): void
+    onMode(listener: (mode: ChatMode) => void): Unsubscribe
+    /** Janela de chat: tamanho do conteúdo no modo mínimo. */
+    resize(size: Size): void
+    getPrefs(): Promise<ChatPrefs>
+    setPrefs(prefs: ChatPrefs): void
+    onPrefs(listener: (prefs: ChatPrefs) => void): Unsubscribe
+    /** Pill: mensagens que chegaram desde a última vez que o chat foi aberto. */
+    onUnread(listener: (count: number) => void): Unsubscribe
+  }
+  session: {
+    /** Pill: guardar (ou parar de guardar) a cópia da sessão para a migração de host. */
+    mirror(request: SessionMirrorRequest | null): void
+    /** Pill: junta à cópia as mensagens que chegaram depois da última cópia. */
+    saveMessages(messages: ChatMessage[]): Promise<void>
   }
 }
 

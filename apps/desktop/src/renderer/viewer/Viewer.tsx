@@ -1,4 +1,5 @@
 import type { JoinResponse, ViewerTarget } from '@sharescreen/shared'
+import { PASSWORD_HEADER } from '@sharescreen/shared'
 import { Maximize, Minimize, Volume2, VolumeX } from 'lucide-react'
 import { Room, RoomEvent, Track } from 'livekit-client'
 import type { RemoteParticipant, RemoteTrack, RemoteTrackPublication } from 'livekit-client'
@@ -62,7 +63,10 @@ export function Viewer() {
       try {
         const response = await fetch(`${who.serverUrl}/join`, {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          headers: {
+            'content-type': 'application/json',
+            ...(who.password ? { [PASSWORD_HEADER]: who.password } : {}),
+          },
           body: JSON.stringify({ name: translate('viewer.spectator'), viewer: true }),
         })
         if (!response.ok) throw new Error(String(response.status))

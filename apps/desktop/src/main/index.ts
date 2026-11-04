@@ -1,16 +1,19 @@
 import { join } from 'node:path'
-import { app } from 'electron'
+import { app, BrowserWindow, powerMonitor } from 'electron'
 import { HotkeyService } from './hotkeys'
 import { captureRendererLogs, setupLogging } from './logger'
 import { registerIpcHandlers } from './ipc'
 import { OverlayManager } from './overlay/overlay-manager'
 import { DiscoveryService } from './network/discovery'
 import { HostService } from './network/host-service'
+import { SessionMirror } from './network/session-mirror'
+import { ChatWindow } from './overlay/chat-window'
 import { PeopleWindow } from './overlay/people-window'
 import { SettingsStore } from './settings/settings-store'
 import { ShareService } from './share/share-service'
 import { ViewerManager } from './share/viewer-manager'
 import { createTray } from './tray'
+import { Updater, updatesEnabled } from './updater'
 
 /**
  * --profile=<nome>: pasta de dados separada. Serve para abrir uma segunda instância
@@ -27,6 +30,13 @@ if (profile) {
 // O áudio da chamada toca sem precisar de um clique antes (política de autoplay do Chromium).
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 
+// Windows: o Chromium calcula se a janela está "coberta" e, se estiver, para de desenhá-la.
+// Depois de Win+L, de a tela apagar por inatividade ou de ocultar o overlay, as janelas
+// transparentes e sempre no topo às vezes não voltam desse estado: aparecem, mas param de
+// responder. Sem esse cálculo, elas continuam vivas.
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+
 // Uma instância por perfil: abrir de novo traz o overlay e o painel
 // (também é por aqui que chegarão os links accord:// no M4).
 if (!app.requestSingleInstanceLock()) {
@@ -37,7 +47,8 @@ if (!app.requestSingleInstanceLock()) {
   const hotkeys = new HotkeyService(overlay)
   const share = new ShareService(overlay)
   const viewers = new ViewerManager()
-  const host = new HostService()
+  let mirror: SessionMirror | null = null
+  let host: HostService | null = null
 
   app.on('second-instance', () => overlay.openPanel('channels'))
 
@@ -57,9 +68,40 @@ if (!app.requestSingleInstanceLock()) {
     share.register()
     const people = new PeopleWindow(overlay)
     const discovery = new DiscoveryService()
-    registerIpcHandlers({ overlay, hotkeys, share, viewers, people, settings, discovery, host })
-    const tray = createTray(overlay, profile)
+    const updater = new Updater(updatesEnabled(profile))
+    const sessionMirror = new SessionMirror()
+    const hostService = new HostService(sessionMirror)
+    mirror = sessionMirror
+    host = hostService
+    const chat = new ChatWindow(overlay, (channel, payload) => overlay.sendToPill(channel, payload))
+    registerIpcHandlers({
+      overlay,
+      hotkeys,
+      share,
+      viewers,
+      people,
+      settings,
+      discovery,
+      host: hostService,
+      updater,
+      chat,
+      mirror: sessionMirror,
+    })
+    const tray = createTray(overlay, profile, updater)
+    updater.onReady = tray.rebuild
     settings.onLanguageChange = tray.rebuild
+
+    // Voltou do bloqueio, da suspensão ou da inatividade: redesenha e reaplica o "sempre no topo".
+    const wake = (reason: string) => {
+      console.info(`[app] ${reason}: atualizando as janelas do overlay`)
+      overlay.refresh()
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.invalidate()
+      }
+    }
+    powerMonitor.on('unlock-screen', () => wake('desbloqueou'))
+    powerMonitor.on('resume', () => wake('voltou da suspensão'))
+    powerMonitor.on('user-did-become-active', () => wake('voltou da inatividade'))
   })
 
   // O app vive na bandeja: fechar janelas não encerra; só "Sair" encerra.
@@ -67,6 +109,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('will-quit', () => {
     hotkeys.dispose()
     // O servidor aberto pelo botão Hospedar fecha junto com o app.
-    host.stop()
+    host?.stop()
+    mirror?.clear()
   })
 }

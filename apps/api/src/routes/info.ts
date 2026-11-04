@@ -3,6 +3,7 @@ import { Elysia } from 'elysia'
 import pkg from '../../package.json'
 import { env } from '../env'
 import { CHANNEL_NAME, ROOM, roomService } from '../services/livekit'
+import { hasPassword } from '../services/session'
 
 const serverId = crypto.randomUUID()
 
@@ -26,4 +27,5 @@ export const infoRoutes = new Elysia().get('/info', async (): Promise<ServerInfo
   version: pkg.version,
   port: env.port,
   channels: [{ id: ROOM, name: CHANNEL_NAME, people: await peopleIn(ROOM) }],
+  locked: hasPassword(),
 }))
