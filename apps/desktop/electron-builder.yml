@@ -36,6 +36,11 @@ win:
     - target: nsis
       arch: [x64]
   icon: resources/icon.ico
+# Convites: o instalador registra os links accord:// para abrir o app.
+protocols:
+  - name: Accord
+    schemes:
+      - accord
 nsis:
   oneClick: false
   perMachine: false

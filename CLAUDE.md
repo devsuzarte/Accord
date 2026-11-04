@@ -21,7 +21,7 @@ App desktop de voz + compartilhamento de tela em overlay, inspirado no Discord. 
 - Overlay: `apps/desktop/src/main/overlay/overlay-manager.ts`. As superfícies medem o próprio conteúdo com `useReportSize` (ResizeObserver) e o main ajusta a janela. Movimentos feitos por código são marcados em `expectedPosition` para não serem tratados como arrasto
 - Participantes de exemplo do pill: `src/renderer/shared/demo.ts` (só em dev, com `VITE_OVERLAY_DEMO=1`)
 - Chamada: a `Room` do LiveKit vive no pill (`src/renderer/pill/call/callStore.ts`, Zustand). O painel manda `CallCommand` → main → pill; o pill publica `CallSnapshot` → main → painel
-- Entrada aberta: `POST /join { name, viewer? }` (sala `geral`; `viewer: true` = token oculto e só-assistir). `OPEN_JOIN=false` desliga. Contas (M3) e convites (M4) adiados
+- Entrada aberta: `POST /join { name, viewer? }` (sala `geral`; `viewer: true` = token oculto e só-assistir). `OPEN_JOIN=false` desliga. Contas (M3) adiadas
 - Porta padrão da API: 7870 (`packages/shared/src/defaults.ts`, `normalizeServerUrl` completa a porta)
 - Compartilhamento: `src/main/share/` (seletor, `setDisplayMediaRequestHandler`, som nativo via loopback-capture + koffi, viewers). Pill recebe só vozes (`autoSubscribe: false`); o viewer tem conexão própria
 - Som da transmissão: main → MessagePort (repassado pelo preload via `window.postMessage`) → `pcm-player.worklet.js` (importar com `?url&no-inline`: a CSP bloqueia data:)
@@ -46,6 +46,9 @@ App desktop de voz + compartilhamento de tela em overlay, inspirado no Discord. 
 - Troca de host: `pill/call/migration.ts` (fila por `joinedAt`, atributo `addrs`), `main/network/session-mirror.ts` (cópia a cada 10 s em userData/sessao-copia) e `HostService.start({ restore: true })` → env `SHARESCREEN_RESTORE`
 - Vozes tocam pelo WebAudio (`webAudioMix`): volume, ensurdecer e "mutar para mim" são `participant.setVolume`, nunca `<audio>.muted`
 - Atualização automática: `src/main/updater.ts` (electron-updater, GitHub). Publicar: `docs/12-publicar-versao.md`
+- Convites: `packages/shared/src/invite.ts` (`accord://join?h=&n=&p=` e a página `site/convite/` no GitHub Pages, que só repassa). Main: `src/main/invites.ts` (protocolo, `second-instance`) → `InviteReceived` → `panel/InviteCard.tsx`. `CallSnapshot.server` dá URL/nome/senha da chamada atual
+- Qualidade no viewer: `renderer/viewer/quality.ts` (`getRTCStatsReport` a cada 1 s + `connectionQuality` de quem transmite); Econômica = `setVideoQuality(LOW)` (camada de 360p do simulcast)
+- CI e release: `.github/workflows/` (`ci.yml`; `release.yml` publica ao empurrar tag `v*` igual à versão do desktop; `pages.yml` publica `site/`)
 - Windows: `disable-features=CalculateNativeWinOcclusion` evita janelas do overlay "congeladas" depois de bloqueio/inatividade
 
 ## Convenções

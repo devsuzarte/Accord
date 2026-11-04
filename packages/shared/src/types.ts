@@ -90,6 +90,8 @@ export interface CallSnapshot {
   participants: ParticipantState[]
   /** Mensagem pronta para mostrar quando entrar falhou ou a conexão caiu. */
   error: string | null
+  /** Servidor da chamada atual (para gerar convites). */
+  server: { url: string; name: string; password: string | null } | null
 }
 
 /** Comandos que o painel manda para o pill (via main). */

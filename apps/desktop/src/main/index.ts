@@ -13,6 +13,7 @@ import { SettingsStore } from './settings/settings-store'
 import { ShareService } from './share/share-service'
 import { ViewerManager } from './share/viewer-manager'
 import { createTray } from './tray'
+import { InviteService } from './invites'
 import { Updater, updatesEnabled } from './updater'
 
 /**
@@ -50,7 +51,12 @@ if (!app.requestSingleInstanceLock()) {
   let mirror: SessionMirror | null = null
   let host: HostService | null = null
 
-  app.on('second-instance', () => overlay.openPanel('channels'))
+  const invites = new InviteService(overlay)
+
+  // Abrir de novo (ou clicar num convite com o app aberto) traz o painel.
+  app.on('second-instance', (_event, argv) => {
+    if (!invites.handleArgs(argv)) overlay.openPanel('channels')
+  })
 
   app.on('web-contents-created', (_event, contents) => {
     contents.once('did-finish-load', () => {
@@ -86,10 +92,14 @@ if (!app.requestSingleInstanceLock()) {
       updater,
       chat,
       mirror: sessionMirror,
+      invites,
     })
     const tray = createTray(overlay, profile, updater)
     updater.onReady = tray.rebuild
     settings.onLanguageChange = tray.rebuild
+    invites.register()
+    // O app foi aberto por um convite: espera o painel carregar e mostra.
+    setTimeout(() => invites.handleArgs(process.argv), 1500)
 
     // Voltou do bloqueio, da suspensão ou da inatividade: redesenha e reaplica o "sempre no topo".
     const wake = (reason: string) => {

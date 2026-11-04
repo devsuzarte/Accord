@@ -21,6 +21,7 @@ import type { HostService } from './network/host-service'
 import type { PeopleWindow } from './overlay/people-window'
 import type { SettingsStore } from './settings/settings-store'
 import type { Updater } from './updater'
+import type { InviteService } from './invites'
 import type { ChatWindow } from './overlay/chat-window'
 import type { SessionMirror } from './network/session-mirror'
 import type { ShareService } from './share/share-service'
@@ -99,6 +100,7 @@ const idleCall: CallSnapshot = {
   },
   sharing: null,
   channelName: null,
+  server: null,
   participants: [],
   error: null,
 }
@@ -145,6 +147,7 @@ export interface IpcDependencies {
   updater: Updater
   chat: ChatWindow
   mirror: SessionMirror
+  invites: InviteService
 }
 
 const moderationActions = [
@@ -169,6 +172,7 @@ export function registerIpcHandlers({
   updater,
   chat,
   mirror,
+  invites,
 }: IpcDependencies): void {
   type Sender = Pick<IpcMainEvent, 'sender'>
   const fromPill = (event: Sender) => overlay.isPill(event.sender.id)
@@ -372,4 +376,7 @@ export function registerIpcHandlers({
   ipcMain.handle(IpcChannel.SessionSaveMessages, (event, messages: unknown) => {
     if (fromPill(event) && Array.isArray(messages)) mirror.saveMessages(messages as ChatMessage[])
   })
+
+  // Convites (accord://).
+  ipcMain.handle(IpcChannel.InviteTake, (event) => (fromPanel(event) ? invites.take() : null))
 }

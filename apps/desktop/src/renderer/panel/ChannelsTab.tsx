@@ -3,12 +3,14 @@ import {
   DEFAULT_DISCOVERY_PORT,
   DEFAULT_LIVEKIT_PORT,
   normalizeServerUrl,
+  parseInvite,
   shortServerAddress,
 } from '@sharescreen/shared'
 import type {
   CallSnapshot,
   DiscoveredServer,
   HostState,
+  Invite,
   Profile,
   ServerRoute,
 } from '@sharescreen/shared'
@@ -20,6 +22,7 @@ import {
   Eye,
   EyeOff,
   KeyRound,
+  Link2,
   Lock,
   HeadphoneOff,
   Loader,
@@ -38,6 +41,9 @@ import type { FormEvent } from 'react'
 import { channelLabel, useT } from '../shared/i18n'
 import { readJson, readString, write } from '../shared/storage'
 import { AudioSettings } from './AudioSettings'
+import { InviteCard, useInvite } from './InviteCard'
+import { CopyInviteButton } from '../shared/CopyInviteButton'
+import { inviteFor, sortAddresses } from '../shared/invites'
 
 type Mode = 'join' | 'host' | 'guide'
 
@@ -73,9 +79,24 @@ export function ChannelsTab({ call, profile, onEditProfile }: ChannelsTabProps) 
   const [mode, setMode] = useState<Mode>('join')
   const inCall = call.status === 'connected' || call.status === 'reconnecting'
   const modes: Mode[] = ['join', 'host', 'guide']
+  const [invite, setInvite] = useInvite()
 
   return (
     <div className="stack">
+      {invite && (
+        <InviteCard
+          invite={invite}
+          call={call}
+          profile={profile}
+          onJoin={(serverUrl, password) => {
+            setInvite(null)
+            setMode('join')
+            rememberServer(serverUrl)
+            join(profile, serverUrl, password)
+          }}
+          onDismiss={() => setInvite(null)}
+        />
+      )}
       <div className="segments" role="tablist" aria-label={t('channels.modes')}>
         {modes.map((id) => (
           <button
@@ -95,7 +116,12 @@ export function ChannelsTab({ call, profile, onEditProfile }: ChannelsTabProps) 
         (inCall ? (
           <CurrentChannel call={call} />
         ) : (
-          <JoinList call={call} profile={profile} onEditProfile={onEditProfile} />
+          <JoinList
+            call={call}
+            profile={profile}
+            onEditProfile={onEditProfile}
+            onInvite={setInvite}
+          />
         ))}
       {mode === 'host' && (
         <HostSection call={call} profile={profile} onEditProfile={onEditProfile} />
@@ -143,6 +169,7 @@ function CurrentChannel({ call }: { call: CallSnapshot }) {
         </ul>
       </div>
       {call.error && <p className="notice notice--warn">{call.error}</p>}
+      <CopyInviteButton server={call.server} className="action" />
       <button
         type="button"
         className="action action--danger"
@@ -167,6 +194,12 @@ function NeedName({ onEditProfile }: { onEditProfile(): void }) {
       </button>
     </div>
   )
+}
+
+/** Guarda o endereço na lista de salvos (para aparecer na busca da próxima vez). */
+function rememberServer(url: string): void {
+  const saved = readJson<string[]>(SAVED_KEY, [])
+  if (!saved.includes(url)) write(SAVED_KEY, [...saved, url])
 }
 
 function join(profile: Profile, serverUrl: string, password: string | null = null): void {
@@ -217,7 +250,12 @@ function PasswordInput({
   )
 }
 
-function JoinList({ call, profile, onEditProfile }: ChannelsTabProps) {
+function JoinList({
+  call,
+  profile,
+  onEditProfile,
+  onInvite,
+}: ChannelsTabProps & { onInvite(invite: Invite): void }) {
   const t = useT()
   const [servers, setServers] = useState<DiscoveredServer[] | null>(null)
   const [scanning, setScanning] = useState(false)
@@ -266,6 +304,14 @@ function JoinList({ call, profile, onEditProfile }: ChannelsTabProps) {
     event.preventDefault()
     const value = address.trim()
     if (!value || probing) return
+    // Colou um link de convite: mostra o cartão do convite em vez de testar como endereço.
+    const pasted = parseInvite(value)
+    if (pasted) {
+      setAddress('')
+      setProbeError(null)
+      onInvite(pasted)
+      return
+    }
     setProbing(true)
     setProbeError(null)
     const result = await window.platform.discovery.probe(value)
@@ -337,7 +383,7 @@ function JoinList({ call, profile, onEditProfile }: ChannelsTabProps) {
               className="field__input"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder={t('channels.addressPlaceholder')}
+              placeholder={t('channels.addressPlaceholderInvite')}
               spellCheck={false}
               disabled={probing}
             />
@@ -491,6 +537,27 @@ function useHostState(): HostState | null {
   return state
 }
 
+function CopyInvite({ address, link }: { address: string; link: string }) {
+  const t = useT()
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      type="button"
+      className="icon-button"
+      aria-label={copied ? t('invite.copied') : t('invite.copyFor', { address })}
+      title={copied ? t('invite.copied') : t('invite.copyFor', { address })}
+      onClick={() => {
+        void navigator.clipboard.writeText(link).then(() => {
+          setCopied(true)
+          setTimeout(() => setCopied(false), 1500)
+        })
+      }}
+    >
+      {copied ? <Check size={15} /> : <Link2 size={15} />}
+    </button>
+  )
+}
+
 function CopyAddress({ address }: { address: string }) {
   const t = useT()
   const [copied, setCopied] = useState(false)
@@ -591,11 +658,15 @@ function HostSection({ call, profile, onEditProfile }: ChannelsTabProps) {
           {host.addresses.length ? t('host.share') : t('host.noAddresses')}
         </p>
         <ul className="addresses">
-          {host.addresses.map((a) => (
+          {sortAddresses(host.addresses).map((a) => (
             <li key={a.address} className="address">
               <span className="address__route">{t(routeKey(a.route))}</span>
               <code className="address__ip">{a.address}</code>
               <CopyAddress address={a.address} />
+              <CopyInvite
+                address={a.address}
+                link={inviteFor(a.address, '', host.locked ? password.trim() || null : null)}
+              />
             </li>
           ))}
         </ul>

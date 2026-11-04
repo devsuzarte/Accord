@@ -1,4 +1,5 @@
 import type { LanguageSetting, LanguageState } from './i18n'
+import type { Invite } from './invite'
 import type {
   AppInfo,
   ChatMode,
@@ -162,6 +163,11 @@ export interface PlatformBridge {
     mirror(request: SessionMirrorRequest | null): void
     /** Pill: junta à cópia as mensagens que chegaram depois da última cópia. */
     saveMessages(messages: ChatMessage[]): Promise<void>
+  }
+  invite: {
+    /** Painel: pega o convite que abriu o app (e o tira da fila). */
+    take(): Promise<Invite | null>
+    onInvite(listener: (invite: Invite) => void): Unsubscribe
   }
 }
 

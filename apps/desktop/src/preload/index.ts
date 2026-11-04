@@ -2,7 +2,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import { IpcChannel, SHARE_AUDIO_PORT_MESSAGE } from '@sharescreen/shared'
-import type { ChatMode, ChatPrefs } from '@sharescreen/shared'
+import type { ChatMode, ChatPrefs, Invite } from '@sharescreen/shared'
 import type {
   CallCommand,
   CallSnapshot,
@@ -125,6 +125,10 @@ const platform: PlatformBridge = {
   session: {
     mirror: (request) => ipcRenderer.send(IpcChannel.SessionMirror, request),
     saveMessages: (messages) => ipcRenderer.invoke(IpcChannel.SessionSaveMessages, messages),
+  },
+  invite: {
+    take: () => ipcRenderer.invoke(IpcChannel.InviteTake),
+    onInvite: (listener) => subscribe<Invite>(IpcChannel.InviteReceived, listener),
   },
 }
 

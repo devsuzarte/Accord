@@ -5,15 +5,17 @@ O layout do pill e do painel está **aprovado**. Este documento reorganiza o [ro
 Cada marco termina com algo que dá para **usar e mostrar**. Tamanhos relativos: P (pequeno), M (médio), G (grande).
 
 ```
- M1 Ligação ─► M2 Tela ─► M5 Som do app ─► M6 Entrega ─► M7 Moderação ─► M8 Hospedar, achar e idiomas ─► M9 Chat, senha e troca de host     M3 Contas · M4 Convites
-     ✅          ✅           ✅              ✅            ✅               ✅                              ✅                         ⏸ adiados
+ M1 Ligação ─► M2 Tela ─► M5 Som do app ─► M6 Entrega ─► M7 Moderação ─► M8 Hospedar, achar e idiomas ─► M9 Chat, senha e troca de host ─► M10 Convites e qualidade     M3 Contas
+     ✅          ✅           ✅              ✅            ✅               ✅                              ✅                                 ✅                ⏸ adiado
 ```
 
-> **Decisão (03/11/2026):** M3 e M4 foram adiados. A entrada continua aberta só com um nome (`POST /join`, desligável com `OPEN_JOIN=false`), e a porta padrão passou a ser **7870**. O servidor é distribuído como um pacote de um clique, que sobe o LiveKit junto.
+> **Decisão (03/11/2026):** M3 e M4 foram adiados. (Os convites por link do M4 saíram no M10, em 04/11/2026.) A entrada continua aberta só com um nome (`POST /join`, desligável com `OPEN_JOIN=false`), e a porta padrão passou a ser **7870**. O servidor é distribuído como um pacote de um clique, que sobe o LiveKit junto.
 
 ## Validação no Windows (o que só dá para confirmar aí)
 
-Tudo abaixo foi implementado e testado no Linux do ambiente de desenvolvimento, com duas instâncias, LiveKit 1.13.11, microfone/câmera falsos do Chromium e um tom de teste no lugar do som nativo. O que depende do Windows ainda precisa de você:
+Tudo abaixo foi implementado e testado no Linux do ambiente de desenvolvimento, com duas instâncias, LiveKit 1.13.11, microfone/câmera falsos do Chromium e um tom de teste no lugar do som nativo.
+
+> **Validado (04/11/2026):** o Benjamin usou o app no Windows com amigos de verdade e **aprovou**. Os itens abaixo continuam como roteiro para repetir a cada versão. A atualização automática ainda vai ser testada (publicar uma versão e ver a anterior atualizar).
 
 - [ ] Voz real com fone: as duas instâncias se ouvem; mudo e ensurdecer
 - [ ] Clicar no pill durante um jogo em janela sem bordas **não** tira o foco do jogo
@@ -30,7 +32,9 @@ Tudo abaixo foi implementado e testado no Linux do ambiente de desenvolvimento, 
 - [ ] Depois de Win+L, de a tela apagar e de Ctrl+Shift+O, o pill continua respondendo aos cliques
 - [ ] Volume de uma pessoa em 200% soa mais alto e em 0% some
 - [ ] Troca de host com PCs de verdade (um deles fecha o app no meio da chamada)
-- [ ] Atualização automática: publicar uma 0.2.1 e ver a 0.2.0 instalada atualizar
+- [ ] Atualização automática: publicar uma versão nova pelo GitHub Actions e ver a anterior instalada atualizar
+- [ ] Convite: clicar no link no WhatsApp/Discord abre o Accord com o cartão do convite; colar o link em "Adicionar endereço" também
+- [ ] Viewer: o selo de qualidade e o diagnóstico batem com o que se vê (Wi-Fi ruim de quem transmite → "o gargalo é do lado de quem transmite")
 - [ ] Hospedar pelo app instalado: o Windows pede o firewall para o `accord-server.exe` e o `livekit-server.exe`; fechar o app encerra os dois
 - [ ] Um segundo PC na mesma rede **e** um no Radmin VPN veem o canal em "Canais encontrados" sem digitar nada
 - [ ] Recortar um GIF de verdade (da internet): a foto continua animada para os outros
@@ -149,6 +153,22 @@ Sem contas ainda: cada um digita um nome e entra no canal "Geral". É um atalho 
 - Mensagens enviadas nos últimos segundos antes da queda podem faltar para quem não as recebeu.
 - Só funciona se o app de quem assume puder hospedar (firewall liberado e o servidor junto no instalador).
 
+## M10 — Build no GitHub, convites por link e qualidade no viewer (M) · ✅ implementado (04/11/2026)
+
+> Testado com duas instâncias: A hospeda com senha e copia o convite (o link saiu com o IP da rede, não `localhost`, e com a senha); B abriu com o link `accord://`, mostrou o cartão e entrou direto, sem digitar senha. No viewer de B, o selo mostrou `720p · 20 fps`, o painel trouxe resolução, taxa, perda, atraso, travadas e a conexão de quem transmite, e a opção Econômica passou a receber `360p · 15 fps`.
+
+| # | O que | Onde |
+|---|---|---|
+| 10.1 | **CI** (typecheck, lint e Prettier) em todo push e pull request | `.github/workflows/ci.yml` |
+| 10.2 | **Release automática**: empurrar uma tag `v0.3.0` gera o instalador no Windows do GitHub e publica a release com `latest.yml` (o que a atualização automática lê). Grátis em repositório público | `.github/workflows/release.yml`, [12](12-publicar-versao.md) |
+| 10.3 | **Convite por link**: `accord://join?h=IP:porta&n=nome&p=senha` (o instalador registra o protocolo) e a versão clicável `https://devsuzarte.github.io/Accord/convite/#…`, uma página estática no GitHub Pages que só repassa para o `accord://`. Os dados vão depois do `#`, que o navegador não manda para servidor nenhum | `packages/shared/src/invite.ts`, `main/invites.ts`, `site/convite/` |
+| 10.4 | Onde copiar: **Canais → na chamada → Copiar convite**, ícone de link na lista de pessoas e em cada endereço da aba Hospedar. Colar um link em "Adicionar endereço" também abre o cartão | `panel/InviteCard.tsx`, `shared/CopyInviteButton.tsx` |
+| 10.5 | **Qualidade no viewer**: selo com resolução, fps e cor (boa/instável/ruim); painel com taxa, perda, atraso, oscilação, travadas, codec e a conexão de quem transmite; diagnóstico de **onde** está o gargalo; escolha Automática ou Econômica (camada de 360p) | `renderer/viewer/quality.ts`, `QualityPanel.tsx` |
+
+**Uma vez só, no GitHub:** Settings → Pages → Source: **GitHub Actions** (sem isso o link `https://…/convite/` dá 404; o `accord://` funciona do mesmo jeito).
+
+**Limites:** o link leva a senha em texto (quem recebe o link entra; troque a senha se ele vazar). O convite usa o primeiro endereço na ordem Radmin → rede local → Tailscale → outras VPNs; para um amigo de outra rede, copie o do endereço certo na aba Hospedar.
+
 ---
 
 ## M3 — Contas, canais e presença (G)
@@ -169,6 +189,8 @@ Sem contas ainda: cada um digita um nome e entra no canal "Geral". É um atalho 
 ---
 
 ## M4 — Amigos de fora da sua rede (M)
+
+> **Parcial:** convites por link entraram no M10. Falta o assistente de conexão.
 
 **Resultado:** você clica em "Criar meu servidor", manda um link e um amigo de outra cidade entra.
 
@@ -198,7 +220,7 @@ Sem contas ainda: cada um digita um nome e entra no canal "Geral". É um atalho 
 
 ---
 
-## M6 — Entrega (M) · ✅ implementado (falta só a atualização automática)
+## M6 — Entrega (M) · ✅ implementado
 
 > - **Servidor de um clique:** `bun run package:server` gera `release/accord-server/` com `accord-server.exe` (API compilada) + `livekit-server.exe` + `LEIA-ME.txt`. A API sobe o LiveKit com chaves geradas na 1ª execução (`dados/chaves.json`) e mostra os IPs da máquina. Testado no Linux: duas instâncias conversaram pelo pacote.
 > - **Instalador:** `bun run package:desktop` (NSIS, x64). Testado o empacotamento no Linux (`--linux dir`): app abre a partir do `.asar`, entra no servidor, o AudioWorklet carrega de `file://`, módulos nativos ficam fora do `.asar`.

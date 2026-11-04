@@ -16,6 +16,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type React from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { channelLabel, t as translate, useT } from '../shared/i18n'
+import { CopyInviteButton } from '../shared/CopyInviteButton'
 import { useCallSnapshot } from '../shared/useCallSnapshot'
 
 const send = (command: CallCommand) => window.platform.call.command(command)
@@ -95,6 +96,7 @@ export function People() {
           {call.channelName && (
             <span className="people__channel">{channelLabel('geral', call.channelName)}</span>
           )}
+          <CopyInviteButton server={call.server} className="people__close people__invite" compact />
           <button
             type="button"
             className="people__close"

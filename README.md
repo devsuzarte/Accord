@@ -90,9 +90,11 @@ O que já existe:
 - **Senha do canal:** quem hospeda define (ou troca com o canal aberto); os canais com senha aparecem com cadeado na lista.
 - **Troca de host:** se o PC de quem hospeda cair, a sessão passa para quem entrou primeiro, que abre o próprio servidor com a cópia da sessão (senha, chat, anexos, silêncios); os outros reconectam no IP dele sozinhos.
 - **Volume por pessoa:** 0% a 200%, só para você, no clique direito da lista de pessoas.
-- **Entrega:** pacote do servidor de um clique, instalador, **atualização automática** pelo GitHub Releases ([12](docs/12-publicar-versao.md)), logs e diagnóstico.
+- **Convites por link:** "Copiar convite" gera um link que abre o Accord direto no canal (com a senha, se tiver). Funciona clicado no WhatsApp ou no Discord.
+- **Qualidade no viewer:** selo com resolução e fps, painel com taxa, perda, atraso e travadas, diagnóstico de onde está o gargalo e opção Econômica (360p).
+- **Entrega:** pacote do servidor de um clique, instalador, **atualização automática** pelo GitHub Releases, publicada sozinha pelo GitHub Actions ao criar uma tag ([12](docs/12-publicar-versao.md)), logs e diagnóstico.
 
-Fora por enquanto: contas e vários canais (M3), convites e assistente de conexão (M4), atualização automática (precisa de um repositório no GitHub). Para revisar o visual com **participantes de exemplo**, crie `apps/desktop/.env.development.local` com `VITE_OVERLAY_DEMO=1`.
+Fora por enquanto: contas e vários canais (M3) e o assistente de conexão (M4). Ideias para os próximos passos: [13](docs/13-ideias.md). Para revisar o visual com **participantes de exemplo**, crie `apps/desktop/.env.development.local` com `VITE_OVERLAY_DEMO=1`.
 
 ## Documentos
 

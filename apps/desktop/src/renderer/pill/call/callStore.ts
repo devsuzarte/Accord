@@ -343,7 +343,7 @@ export const useCallStore = create<CallStore>((set, get) => {
     lastMirror = ''
     window.platform.session.mirror(null)
     if (error) log(`saiu do canal: ${error}`)
-    set({ status: 'idle', sharing: null, channelName: null, participants: [], error })
+    set({ status: 'idle', sharing: null, channelName: null, participants: [], error, server: null })
   }
 
   const wire = (r: Room) => {
@@ -504,7 +504,15 @@ export const useCallStore = create<CallStore>((set, get) => {
     if (audio.outputDeviceId) {
       await r.switchActiveDevice('audiooutput', audio.outputDeviceId).catch(() => undefined)
     }
-    set({ status: 'connected', channelName: access.channelName, error: null })
+    const info = await fetch(`${base}/info`, { signal: AbortSignal.timeout(3000) })
+      .then((r) => r.json() as Promise<{ name?: string }>)
+      .catch(() => null)
+    set({
+      status: 'connected',
+      channelName: access.channelName,
+      error: null,
+      server: { url: base, name: info?.name ?? '', password },
+    })
     sound('join')
     log(`conectado em ${access.livekitUrl} como ${access.role}`)
 
@@ -609,6 +617,7 @@ export const useCallStore = create<CallStore>((set, get) => {
     channelName: null,
     participants: [],
     error: null,
+    server: null,
 
     async join(name, joinUrl, joinPassword) {
       if (get().status !== 'idle') return
@@ -846,6 +855,7 @@ export function startReportingCallState(): () => void {
     channelName: s.channelName,
     participants: s.participants,
     error: s.error,
+    server: s.server,
   })
   window.platform.call.report(toSnapshot(useCallStore.getState()))
   const unsubscribeStore = useCallStore.subscribe((s) => window.platform.call.report(toSnapshot(s)))

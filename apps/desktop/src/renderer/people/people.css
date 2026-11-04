@@ -342,3 +342,7 @@
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
 }
+
+.people__invite + .people__close {
+  margin-left: 0;
+}

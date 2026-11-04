@@ -97,6 +97,8 @@ export const IpcChannel = {
   ChatPrefsChanged: 'chat:prefs-changed',
   ChatUnreadChanged: 'chat:unread-changed',
   SessionMirror: 'session:mirror',
+  InviteReceived: 'invite:received',
+  InviteTake: 'invite:take',
   SessionSaveMessages: 'session:save-messages',
 } as const
 

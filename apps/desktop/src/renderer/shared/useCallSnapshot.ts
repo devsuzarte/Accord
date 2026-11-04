@@ -13,6 +13,7 @@ const initial: CallSnapshot = {
   },
   sharing: null,
   channelName: null,
+  server: null,
   participants: [],
   error: null,
 }

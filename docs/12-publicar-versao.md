@@ -10,22 +10,38 @@ Reiniciar e atualizar** (ou pela bandeja).
 > (`releaseType: release`) e baixa só a diferença do instalador, pelo `.blockmap`.
 > O repositório precisa ser **público** para o app conseguir ler as releases sem senha.
 
-## Passo a passo
+## Passo a passo (automático, pelo GitHub Actions)
 
-1. Aumente a versão nos três `package.json` (raiz, `apps/desktop`, `apps/api`), por exemplo `0.2.0` → `0.2.1`.
+1. Aumente a versão nos três `package.json` (raiz, `apps/desktop`, `apps/api`), por exemplo `0.3.0` → `0.3.1`.
    O app só atualiza se a versão da release for **maior** que a instalada.
-2. Gere tudo no Windows (ou no Linux com wine, ver `CLAUDE.md`):
-   ```powershell
-   bun run package
+2. Faça o commit e crie a tag com a **mesma** versão, com `v` na frente:
+   ```bash
+   git commit -am "0.3.1"
+   git tag v0.3.1
+   git push && git push --tags
    ```
-3. No GitHub: **Releases → Draft a new release**.
-   - Tag: `v0.2.1` (mesma versão, com `v` na frente) → **Create new tag**.
-   - Anexe os **três** arquivos de `release/app/`:
-     - `Accord-Setup-0.2.1.exe`
-     - `Accord-Setup-0.2.1.exe.blockmap`
-     - `latest.yml`
-   - Deixe **desmarcado** "Set as a pre-release" e publique (**Publish release**).
+3. O workflow **Release** (`.github/workflows/release.yml`) roda num Windows do GitHub: baixa o
+   LiveKit oficial (conferindo o SHA-256), gera o instalador e cria a release `Accord 0.3.1` com
+   os três arquivos (`Accord-Setup-0.3.1.exe`, `.blockmap` e `latest.yml`) e as notas geradas
+   pelos commits. Acompanhe em **Actions**; leva uns 10 minutos.
 4. Pronto: em até 6 horas (ou ao abrirem o app) todos recebem a versão nova.
+
+Se a tag não bater com a versão do `apps/desktop/package.json`, o workflow para com erro antes
+de gastar tempo no build. Uma tag com hífen (`v0.3.1-teste`) vira **pré-lançamento**: só quem
+baixar à mão recebe.
+
+> **[Verificado]** GitHub Actions é grátis sem limite de minutos em repositório **público**
+> (em privado, o plano grátis tem uma cota mensal e o Windows conta em dobro).
+
+Também dá para rodar o workflow à mão (**Actions → Release → Run workflow**): ele só gera o
+instalador e deixa como artefato para baixar, sem publicar release.
+
+## Passo a passo (à mão, se precisar)
+
+1. Aumente a versão nos três `package.json`.
+2. Gere tudo no Windows (ou no Linux com wine, ver `CLAUDE.md`): `bun run package`.
+3. No GitHub: **Releases → Draft a new release**, tag `v0.3.1`, anexe os **três** arquivos de
+   `release/app/` (`.exe`, `.exe.blockmap`, `latest.yml`) e publique sem marcar pré-lançamento.
 
 Sem o `latest.yml` a release não serve para a atualização automática (o instalador ainda pode
 ser baixado à mão).

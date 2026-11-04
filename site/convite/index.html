@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Convite do Accord</title>
+    <meta name="description" content="Entre numa chamada do Accord com um clique." />
+    <link rel="icon" href="../logo.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #111214;
+        --surface: #1e1f22;
+        --raised: #2b2d31;
+        --line: rgba(255, 255, 255, 0.09);
+        --text: #f2f3f5;
+        --muted: #949ba4;
+        --brand: #5865f2;
+        --brand-hover: #4752c4;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 24px 16px;
+        background:
+          radial-gradient(
+            60rem 30rem at 50% -10%,
+            color-mix(in srgb, var(--brand) 22%, transparent),
+            transparent
+          ),
+          var(--bg);
+        color: var(--text);
+        font:
+          400 16px/1.5 'Noto Sans',
+          system-ui,
+          sans-serif;
+      }
+      main {
+        width: min(420px, 100%);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .logo {
+        width: 72px;
+        height: auto;
+      }
+      .card {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 20px;
+        border-radius: 16px;
+        background: var(--surface);
+        box-shadow: inset 0 0 0 1px var(--line);
+      }
+      .lead {
+        margin: 0;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 800;
+        line-height: 1.15;
+        overflow-wrap: anywhere;
+      }
+      .address {
+        margin: 0;
+        font-size: 14px;
+        font-variant-numeric: tabular-nums;
+        color: var(--muted);
+      }
+      .lock {
+        margin: 6px 0 0;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 0 18px;
+        border-radius: 10px;
+        font-weight: 600;
+        text-decoration: none;
+        color: var(--text);
+        background: var(--raised);
+        box-shadow: inset 0 0 0 1px var(--line);
+      }
+      .button:hover {
+        background: color-mix(in srgb, var(--raised) 80%, white);
+      }
+      .button--primary {
+        background: var(--brand);
+        box-shadow: none;
+        color: #fff;
+      }
+      .button--primary:hover {
+        background: var(--brand-hover);
+      }
+      .button:focus-visible {
+        outline: 2px solid var(--text);
+        outline-offset: 2px;
+      }
+      .help {
+        margin: 0;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .help a {
+        color: var(--text);
+      }
+      .bad h1 {
+        font-size: 22px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img class="logo" src="../logo.svg" alt="Accord" />
+
+      <section class="card" id="ok" hidden>
+        <p class="lead" data-t="lead">Você foi convidado para uma chamada</p>
+        <h1 id="name"></h1>
+        <p class="address" id="address"></p>
+        <p class="lock" id="lock" data-t="lock" hidden>O convite já leva a senha do canal.</p>
+      </section>
+
+      <section class="card bad" id="bad" hidden>
+        <h1 data-t="badTitle">Este link de convite está incompleto</h1>
+        <p class="lead" data-t="badText">
+          Peça um novo convite para quem está hospedando a chamada.
+        </p>
+      </section>
+
+      <div class="actions" id="actions" hidden>
+        <a class="button button--primary" id="open" data-t="open">Abrir no Accord</a>
+        <a
+          class="button"
+          href="https://github.com/devsuzarte/Accord/releases/latest"
+          data-t="download"
+          >Baixar o Accord para Windows</a
+        >
+      </div>
+
+      <p class="help" data-t="help">
+        Não abriu nada? Instale o Accord, abra uma vez e clique em “Abrir no Accord” de novo.
+      </p>
+    </main>
+
+    <script>
+      const en = !/^pt/i.test(navigator.language || '')
+      const texts = {
+        lead: 'You were invited to a call',
+        lock: 'The invite includes the channel password.',
+        badTitle: 'This invite link is incomplete',
+        badText: 'Ask whoever is hosting the call for a new invite.',
+        open: 'Open in Accord',
+        download: 'Download Accord for Windows',
+        help: 'Nothing opened? Install Accord, open it once and click “Open in Accord” again.',
+      }
+      if (en) {
+        document.documentElement.lang = 'en'
+        document.title = 'Accord invite'
+        for (const el of document.querySelectorAll('[data-t]')) el.textContent = texts[el.dataset.t]
+      }
+
+      // Os dados ficam depois do "#": o navegador não envia essa parte para o servidor.
+      const q = new URLSearchParams(location.hash.slice(1))
+      const host = (q.get('h') || '').trim()
+      const valid = /^[a-z0-9.-]{1,253}(:\d{1,5})?$/i.test(host)
+      const actions = document.getElementById('actions')
+      if (!valid) {
+        document.getElementById('bad').hidden = false
+      } else {
+        const name = (q.get('n') || '').slice(0, 48)
+        document.getElementById('name').textContent = name || host
+        document.getElementById('address').textContent = name ? host : ''
+        document.getElementById('lock').hidden = !q.get('p')
+        document.getElementById('ok').hidden = false
+        actions.hidden = false
+        const link = 'accord://join?' + q.toString()
+        const open = document.getElementById('open')
+        open.href = link
+        // Tenta abrir sozinho uma vez; se o Accord não estiver instalado, nada acontece.
+        setTimeout(() => {
+          location.href = link
+        }, 400)
+      }
+    </script>
+  </body>
+</html>

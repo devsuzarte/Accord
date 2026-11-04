@@ -2,11 +2,24 @@ import type { JoinResponse, ViewerTarget } from '@sharescreen/shared'
 import { PASSWORD_HEADER } from '@sharescreen/shared'
 import { Maximize, Minimize, Volume2, VolumeX } from 'lucide-react'
 import { Room, RoomEvent, Track } from 'livekit-client'
-import type { RemoteParticipant, RemoteTrack, RemoteTrackPublication } from 'livekit-client'
+import type {
+  RemoteParticipant,
+  RemoteTrack,
+  RemoteTrackPublication,
+  RemoteVideoTrack,
+} from 'livekit-client'
 import { useEffect, useRef, useState } from 'react'
 import { isLocallyMuted, onLocalMutesChange, readLocalMutes } from '../shared/localMutes'
 import { t as translate, useT } from '../shared/i18n'
 import type { LocalMutes } from '../shared/localMutes'
+import { QualityBadge, QualityPanel } from './QualityPanel'
+import {
+  applyQualityChoice,
+  readQualityChoice,
+  saveQualityChoice,
+  useStreamQuality,
+} from './quality'
+import type { QualityChoice } from './quality'
 
 type Phase = 'connecting' | 'waiting' | 'live' | 'ended' | 'error'
 
@@ -45,6 +58,19 @@ export function Viewer() {
   const [muted, setMuted] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [chromeVisible, setChromeVisible] = useState(true)
+  const [screen, setScreen] = useState<{
+    track: RemoteVideoTrack
+    pub: RemoteTrackPublication
+    participant: RemoteParticipant
+  } | null>(null)
+  const [choice, setChoice] = useState<QualityChoice>(readQualityChoice)
+  const [statsOpen, setStatsOpen] = useState(false)
+  const stats = useStreamQuality(
+    screen?.track ?? null,
+    screen?.pub ?? null,
+    screen?.participant ?? null,
+    choice,
+  )
 
   useEffect(() => {
     let room: Room | null = null
@@ -100,10 +126,12 @@ export function Viewer() {
         )
         .on(
           RoomEvent.TrackSubscribed,
-          (track: RemoteTrack, _pub, participant: RemoteParticipant) => {
+          (track: RemoteTrack, pub: RemoteTrackPublication, participant: RemoteParticipant) => {
             if (participant.identity !== who.identity) return
             if (track.source === Track.Source.ScreenShare && videoRef.current) {
               track.attach(videoRef.current)
+              applyQualityChoice(pub, readQualityChoice())
+              setScreen({ track: track as RemoteVideoTrack, pub, participant })
               setPhase('live')
             }
             if (track.source === Track.Source.ScreenShareAudio && audioRef.current) {
@@ -114,6 +142,7 @@ export function Viewer() {
         )
         .on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
           track.detach()
+          if (track.source === Track.Source.ScreenShare) setScreen(null)
           if (track.source === Track.Source.ScreenShareAudio) setHasAudio(false)
         })
         .on(
@@ -220,13 +249,22 @@ export function Viewer() {
     }
   }, [])
 
+  const chooseQuality = (next: QualityChoice) => {
+    setChoice(next)
+    saveQualityChoice(next)
+    if (screen) applyQualityChoice(screen.pub, next)
+  }
+
   const toggleFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen()
     else void document.documentElement.requestFullscreen()
   }
 
   return (
-    <div className="viewer" data-chrome={chromeVisible || phase !== 'live' || undefined}>
+    <div
+      className="viewer"
+      data-chrome={chromeVisible || statsOpen || phase !== 'live' || undefined}
+    >
       <video
         ref={videoRef}
         className="viewer__video"
@@ -261,6 +299,9 @@ export function Viewer() {
         </span>
 
         <span className="viewer__tools">
+          {phase === 'live' && (
+            <QualityBadge stats={stats} open={statsOpen} onToggle={() => setStatsOpen((o) => !o)} />
+          )}
           {hasAudio ? (
             <span className="viewer__volume">
               <button
@@ -299,6 +340,15 @@ export function Viewer() {
           </button>
         </span>
       </header>
+
+      {statsOpen && phase === 'live' && stats && (
+        <QualityPanel
+          stats={stats}
+          streamerName={target?.name ?? t('viewer.thisPerson')}
+          choice={choice}
+          onChoice={chooseQuality}
+        />
+      )}
     </div>
   )
 }
