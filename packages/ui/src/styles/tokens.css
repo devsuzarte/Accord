@@ -1,0 +1,64 @@
+/*
+ * Design tokens — paleta estilo Discord + material do overlay.
+ * Trocar a paleta inteira = editar só este arquivo. Ver docs/04-design-system.md e docs/09 §4.
+ */
+:root {
+  /* Superfícies (da mais funda para a mais clara) */
+  --bg-floating: #111214;
+  --bg-tertiary: #1e1f22;
+  --bg-secondary: #2b2d31;
+  --bg-primary: #313338;
+  --bg-modifier-hover: rgba(78, 80, 88, 0.3);
+  --bg-modifier-selected: rgba(78, 80, 88, 0.6);
+
+  /* Texto */
+  --text-strong: #f2f3f5;
+  --text-normal: #dbdee1;
+  --text-muted: #949ba4;
+  --interactive: #b5bac1;
+  --interactive-hover: #dbdee1;
+
+  /* Marca e status */
+  --brand: #5865f2;
+  --brand-hover: #4752c4;
+  --status-green: #23a55a;
+  --status-yellow: #f0b232;
+  --status-red: #f23f43;
+
+  /* Material do overlay: cápsula escura quase opaca, borda clara de 1px para
+     destacar sobre jogos escuros, sombra desenhada no CSS (a janela não tem sombra). */
+  --material: rgba(30, 31, 34, 0.94);
+  --material-raised: rgba(255, 255, 255, 0.04);
+  --material-raised-hover: rgba(255, 255, 255, 0.08);
+  --material-border: rgba(255, 255, 255, 0.09);
+  --material-shadow: 0 4px 12px rgba(0, 0, 0, 0.34), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --spine: #18191c;
+  /* Espaço transparente em volta do material, só para a sombra caber sem ser cortada
+     pela borda da janela (sombra: 4px de deslocamento + 12px de desfoque). */
+  --frame-pad: 16px;
+
+  /* Forma */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  /* Espaçamento */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  /* Tipografia — Figtree: geométrica e amigável como a do Discord, legível em 12–14px */
+  --font-sans: 'Figtree Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 17px;
+
+  /* Movimento */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-normal: 200ms;
+}

@@ -1,0 +1,22 @@
+node_modules/
+dist/
+out/
+release/
+.turbo/
+*.log
+
+# ambiente e dados locais
+.env
+.env.*
+!.env.example
+apps/api/data/
+
+# binários baixados
+infra/bin/
+
+# SO / editores
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/

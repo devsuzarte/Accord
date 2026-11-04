@@ -1,0 +1,107 @@
+/// <reference lib="dom" />
+import { contextBridge, ipcRenderer } from 'electron'
+import type { IpcRendererEvent } from 'electron'
+import { IpcChannel, SHARE_AUDIO_PORT_MESSAGE } from '@sharescreen/shared'
+import type {
+  CallCommand,
+  CallSnapshot,
+  HostState,
+  LanguageState,
+  OverlayState,
+  PanelTab,
+  PlatformBridge,
+  Profile,
+  ShareRequest,
+  Theme,
+} from '@sharescreen/shared'
+
+/** Assina um canal main → renderer e devolve a função de cancelar. */
+function subscribe<T>(channel: string, listener: (payload: T) => void): () => void {
+  const handler = (_event: IpcRendererEvent, payload: T) => listener(payload)
+  ipcRenderer.on(channel, handler)
+  return () => ipcRenderer.removeListener(channel, handler)
+}
+
+/**
+ * Implementação Electron do PlatformBridge.
+ * Nunca exponha ipcRenderer diretamente ao renderer.
+ */
+const platform: PlatformBridge = {
+  app: {
+    getInfo: () => ipcRenderer.invoke(IpcChannel.AppGetInfo),
+    quit: () => ipcRenderer.send(IpcChannel.AppQuit),
+  },
+  overlay: {
+    resize: (size) => ipcRenderer.send(IpcChannel.OverlayResize, size),
+    getState: () => ipcRenderer.invoke(IpcChannel.OverlayGetState),
+    setGhost: (ghost) => ipcRenderer.send(IpcChannel.OverlaySetGhost, ghost),
+    moveTo: (corner) => ipcRenderer.send(IpcChannel.OverlayMoveTo, corner),
+    onStateChange: (listener) => subscribe<OverlayState>(IpcChannel.OverlayStateChanged, listener),
+  },
+  panel: {
+    toggle: (tab) => ipcRenderer.send(IpcChannel.PanelToggle, tab),
+    close: () => ipcRenderer.send(IpcChannel.PanelClose),
+    resize: (size) => ipcRenderer.send(IpcChannel.PanelResize, size),
+    onOpenTab: (listener) => subscribe<PanelTab>(IpcChannel.PanelOpenTab, listener),
+  },
+  hotkeys: {
+    list: () => ipcRenderer.invoke(IpcChannel.HotkeysList),
+  },
+  call: {
+    command: (command) => ipcRenderer.send(IpcChannel.CallCommand, command),
+    onCommand: (listener) => subscribe<CallCommand>(IpcChannel.CallCommand, listener),
+    report: (snapshot) => ipcRenderer.send(IpcChannel.CallReport, snapshot),
+    getState: () => ipcRenderer.invoke(IpcChannel.CallGetState),
+    onState: (listener) => subscribe<CallSnapshot>(IpcChannel.CallStateChanged, listener),
+  },
+  share: {
+    openPicker: () => ipcRenderer.send(IpcChannel.ShareOpenPicker),
+    listSources: () => ipcRenderer.invoke(IpcChannel.ShareListSources),
+    select: (request) => ipcRenderer.send(IpcChannel.ShareSelect, request),
+    cancel: () => ipcRenderer.send(IpcChannel.ShareCancel),
+    onStart: (listener) => subscribe<ShareRequest>(IpcChannel.ShareStart, listener),
+    startAudio: (source) => ipcRenderer.invoke(IpcChannel.ShareAudioStart, source),
+    stopAudio: () => ipcRenderer.send(IpcChannel.ShareAudioStop),
+  },
+  viewer: {
+    open: (target) => ipcRenderer.send(IpcChannel.ViewerOpen, target),
+    getTarget: () => ipcRenderer.invoke(IpcChannel.ViewerGetTarget),
+  },
+  people: {
+    toggle: () => ipcRenderer.send(IpcChannel.PeopleToggle),
+    close: () => ipcRenderer.send(IpcChannel.PeopleClose),
+    resize: (size) => ipcRenderer.send(IpcChannel.PeopleResize, size),
+  },
+  profile: {
+    get: () => ipcRenderer.invoke(IpcChannel.ProfileGet),
+    set: (profile) => ipcRenderer.send(IpcChannel.ProfileSet, profile),
+    onChange: (listener) => subscribe<Profile>(IpcChannel.ProfileChanged, listener),
+  },
+  theme: {
+    get: () => ipcRenderer.invoke(IpcChannel.ThemeGet),
+    set: (theme) => ipcRenderer.send(IpcChannel.ThemeSet, theme),
+    onChange: (listener) => subscribe<Theme>(IpcChannel.ThemeChanged, listener),
+  },
+  language: {
+    get: () => ipcRenderer.invoke(IpcChannel.LanguageGet),
+    set: (setting) => ipcRenderer.send(IpcChannel.LanguageSet, setting),
+    onChange: (listener) => subscribe<LanguageState>(IpcChannel.LanguageChanged, listener),
+  },
+  discovery: {
+    scan: (saved) => ipcRenderer.invoke(IpcChannel.DiscoveryScan, saved),
+    probe: (address) => ipcRenderer.invoke(IpcChannel.DiscoveryProbe, address),
+  },
+  host: {
+    getState: () => ipcRenderer.invoke(IpcChannel.HostGetState),
+    start: () => ipcRenderer.send(IpcChannel.HostStart),
+    stop: () => ipcRenderer.send(IpcChannel.HostStop),
+    onChange: (listener) => subscribe<HostState>(IpcChannel.HostStateChanged, listener),
+  },
+}
+
+// MessagePorts não atravessam o contextBridge: repassamos pela janela.
+ipcRenderer.on(IpcChannel.ShareAudioPort, (event) => {
+  window.postMessage({ type: SHARE_AUDIO_PORT_MESSAGE }, '*', event.ports)
+})
+
+contextBridge.exposeInMainWorld('platform', platform)

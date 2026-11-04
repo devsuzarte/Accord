@@ -1,0 +1,26 @@
+/*
+ * Superfícies do overlay (pill e painel): página transparente + material.
+ * A janela tem o tamanho exato de .surface-frame (medido e enviado ao main).
+ */
+html,
+body,
+#root {
+  height: auto;
+  background: transparent;
+  overflow: hidden;
+}
+
+.surface-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Mede o conteúdo natural, sem ser espremido pela largura atual da janela. */
+  width: max-content;
+  padding: var(--frame-pad);
+}
+
+.material {
+  background: var(--material);
+  border: 1px solid var(--material-border);
+  box-shadow: var(--material-shadow);
+}

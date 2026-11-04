@@ -1,0 +1,46 @@
+.ss-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  color: var(--interactive);
+  background: var(--material-raised);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.ss-icon-button[data-size='sm'] {
+  width: 28px;
+  height: 28px;
+}
+
+.ss-icon-button:hover {
+  color: var(--interactive-hover);
+  background: var(--material-raised-hover);
+}
+
+.ss-icon-button[data-tone='on'] {
+  color: #fff;
+  background: var(--brand);
+}
+
+.ss-icon-button[data-tone='alert'] {
+  color: var(--status-red);
+  background: color-mix(in srgb, var(--status-red) 14%, transparent);
+}
+
+.ss-icon-button[data-tone='danger'] {
+  color: #fff;
+  background: var(--status-red);
+}
+
+.ss-icon-button[data-tone='danger']:hover {
+  background: color-mix(in srgb, var(--status-red) 85%, black);
+}
+
+.ss-icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

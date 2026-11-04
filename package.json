@@ -1,0 +1,40 @@
+{
+  "name": "sharescreen",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "bun@1.4.4",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "node node_modules/electron/install.js",
+    "dev": "turbo run dev",
+    "dev:api": "turbo run dev --filter=@sharescreen/api",
+    "dev:desktop": "turbo run dev --filter=@sharescreen/desktop",
+    "dev:second": "bun run --cwd apps/desktop dev:second",
+    "livekit:dev": "bun infra/livekit-dev.ts",
+    "build": "turbo run build",
+    "package": "bun run package:server && bun run package:desktop",
+    "package:server": "bun run --cwd apps/api package:server",
+    "package:desktop": "bun run --cwd apps/desktop package",
+    "typecheck": "turbo run typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.14.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.14.0",
+    "prettier": "3.9.10",
+    "turbo": "2.11.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1"
+  },
+  "trustedDependencies": [
+    "electron",
+    "esbuild"
+  ]
+}

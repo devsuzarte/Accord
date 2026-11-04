@@ -1,0 +1,4 @@
+# node_modules "achatado" (hoisted): o electron-builder não lida bem com
+# node_modules isolados por symlink.
+[install]
+linker = "hoisted"

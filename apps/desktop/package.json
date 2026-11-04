@@ -1,0 +1,41 @@
+{
+  "name": "@sharescreen/desktop",
+  "productName": "Accord",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Accord — voz e compartilhamento de tela em overlay",
+  "author": "devsuzarte",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json",
+    "package": "electron-vite build && electron-builder --win --config electron-builder.yml",
+    "dev:second": "bun scripts/second-instance.ts"
+  },
+  "dependencies": {
+    "koffi": "3.3.6",
+    "loopback-capture": "4.0.0"
+  },
+  "devDependencies": {
+    "@sapphi-red/web-noise-suppressor": "0.4.1",
+    "@sharescreen/config": "workspace:*",
+    "@sharescreen/shared": "workspace:*",
+    "@sharescreen/ui": "workspace:*",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.2.1",
+    "electron": "45.2.2",
+    "electron-builder": "26.18.0",
+    "electron-vite": "6.0.0",
+    "gifenc": "1.0.3",
+    "livekit-client": "2.23.0",
+    "lucide-react": "1.67.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "vite": "8.3.5",
+    "zustand": "5.0.16"
+  }
+}

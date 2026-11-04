@@ -1,0 +1,288 @@
+/*
+ * Pill — o objeto físico do overlay.
+ * A "lombada" (spine) é a alça: arrasta, mostra contagem e voz, e é o que sobra recolhido.
+ * Ela sempre fica do lado da borda da tela onde o pill está encaixado.
+ */
+
+.pill {
+  --avatar-gap: var(--bg-tertiary);
+  display: flex;
+  align-items: stretch;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: opacity var(--dur-normal) var(--ease-out);
+}
+
+.pill[data-side='right'] {
+  flex-direction: row-reverse;
+}
+
+.pill[data-ghost] {
+  opacity: 0.55;
+}
+
+/* ── Lombada ─────────────────────────────────────────── */
+
+.spine {
+  -webkit-app-region: drag;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 26px;
+  padding: 10px 0 6px;
+  background: var(--spine);
+  color: var(--text-muted);
+  cursor: grab;
+}
+
+.pill[data-mode='collapsed'] .spine {
+  width: 30px;
+  border-radius: inherit;
+}
+
+.spine__grip {
+  display: grid;
+  grid-template-columns: repeat(2, 3px);
+  gap: 3px;
+  opacity: 0.7;
+}
+
+.spine__grip i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.spine__count {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+  line-height: 1;
+}
+
+/* Ponto de voz: aceso e respirando quando alguém fala — o único movimento constante do pill. */
+.spine__voice {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bg-modifier-selected);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.spine__voice[data-active] {
+  background: var(--status-green);
+  animation: voice 1.4s ease-in-out infinite;
+}
+
+@keyframes voice {
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--status-green) 18%, transparent);
+  }
+}
+
+.spine__ghost {
+  color: var(--text-normal);
+}
+
+.spine__fold {
+  -webkit-app-region: no-drag;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: auto;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+.spine__fold:hover {
+  color: var(--text-strong);
+  background: var(--material-raised-hover);
+}
+
+/* ── Corpo ───────────────────────────────────────────── */
+
+.pill__body {
+  -webkit-app-region: no-drag;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+}
+
+.me {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 38px;
+  min-width: 0;
+  padding: 3px 10px 3px 3px;
+  border-radius: var(--radius-pill);
+  background: var(--material-raised);
+  text-align: left;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.me:hover {
+  background: var(--material-raised-hover);
+}
+
+.me[data-speaking] {
+  background: color-mix(in srgb, var(--status-green) 13%, transparent);
+}
+
+.me__name {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.me__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--status-red);
+}
+
+.live {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--status-red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+/* ── Controles (sempre visíveis na chamada) ──────────── */
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 2px;
+}
+
+.controls__spacer {
+  flex: 1;
+  min-width: 6px;
+}
+
+/* Botão de pessoas: contagem no canto e um ponto vermelho quando alguém está ao vivo. */
+.people-button {
+  position: relative;
+  display: inline-flex;
+}
+
+.people-button__count {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-secondary);
+  box-shadow: 0 0 0 2px var(--bg-tertiary);
+  color: var(--text-normal);
+  font-size: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.people-button__live {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-red);
+  box-shadow: 0 0 0 2px var(--bg-tertiary);
+  pointer-events: none;
+}
+
+/* ── Sem chamada ─────────────────────────────────────── */
+
+.join {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 38px;
+  padding: 3px 14px 3px 3px;
+  border-radius: var(--radius-pill);
+  background: var(--material-raised);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.join:hover {
+  background: var(--material-raised-hover);
+  color: var(--text-strong);
+}
+
+.join__ring {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--text-muted);
+  color: var(--text-muted);
+}
+
+.join:hover .join__ring {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* ── Estados da conexão ──────────────────────────────── */
+
+.spine__voice[data-unstable] {
+  background: var(--status-yellow);
+  animation: none;
+}
+
+.pill__notice {
+  margin: 0;
+  padding: 0 8px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--status-yellow);
+}
+
+.join--busy {
+  cursor: default;
+  color: var(--text-muted);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pill__notice--error {
+  max-width: 240px;
+  color: color-mix(in srgb, var(--status-red) 45%, var(--text-strong));
+  font-weight: 500;
+  line-height: 1.3;
+}

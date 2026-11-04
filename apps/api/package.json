@@ -1,0 +1,28 @@
+{
+  "name": "@sharescreen/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "build": "bun build src/index.ts --compile --minify --target=bun-windows-x64 --outfile dist/sharescreen-api.exe",
+    "typecheck": "tsc -p tsconfig.json",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio",
+    "package:server": "bun scripts/package-server.ts"
+  },
+  "dependencies": {
+    "@elysiajs/cors": "1.4.2",
+    "@sharescreen/shared": "workspace:*",
+    "drizzle-orm": "0.45.4",
+    "elysia": "1.4.30",
+    "livekit-server-sdk": "2.19.2"
+  },
+  "devDependencies": {
+    "@sharescreen/config": "workspace:*",
+    "@types/bun": "1.4.4",
+    "drizzle-kit": "0.31.11"
+  }
+}

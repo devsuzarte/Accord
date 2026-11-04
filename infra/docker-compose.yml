@@ -1,0 +1,14 @@
+# Alternativa ao binário: LiveKit em Docker (útil para testar em Linux/VPS).
+# No Windows, prefira o livekit-server.exe nativo (rede do Docker Desktop
+# complica UDP). Uso: docker compose -f infra/docker-compose.yml up
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --dev --bind 0.0.0.0 --config /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - '7880:7880'
+      - '7881:7881'
+      - '7882:7882/udp'
+    restart: unless-stopped

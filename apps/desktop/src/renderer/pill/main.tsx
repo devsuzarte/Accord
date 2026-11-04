@@ -1,0 +1,22 @@
+import '@sharescreen/ui/global.css'
+import '@sharescreen/ui/surface.css'
+import './pill.css'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { startLanguage } from '../shared/i18n'
+import { startTheme } from '../shared/theme'
+import { Pill } from './Pill'
+import { startReportingCallState } from './call/callStore'
+
+startReportingCallState()
+
+startTheme()
+
+// O idioma chega antes do primeiro desenho (sem piscar no idioma errado).
+void startLanguage().then(() =>
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <Pill />
+    </StrictMode>,
+  ),
+)

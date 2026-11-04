@@ -1,0 +1,76 @@
+/* Figtree variável: só latin + latin-ext (cobre PT-BR), um arquivo por subset. */
+@import '@fontsource-variable/figtree';
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: 1.35;
+  color: var(--text-normal);
+  background: var(--bg-tertiary);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Barra de rolagem fina, nas cores do tema. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-modifier-selected) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * Imagem de fundo escolhida na aba Aparência (aceita GIF). Fica atrás do conteúdo e com
+ * opacidade baixa (no máximo 0.6) para não atrapalhar a leitura.
+ * Use em qualquer superfície com `.material` ou `.app-backdrop`.
+ */
+.material,
+.app-backdrop {
+  position: relative;
+  isolation: isolate;
+}
+
+.material::before,
+.app-backdrop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--app-bg-image, none) center / cover no-repeat;
+  opacity: var(--app-bg-opacity, 0);
+  pointer-events: none;
+}

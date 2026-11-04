@@ -1,0 +1,50 @@
+appId: com.devsuzarte.accord
+productName: Accord
+executableName: Accord
+# Os módulos nativos já vêm prontos (N-API): nada para recompilar.
+npmRebuild: false
+copyright: Copyright © 2026 devsuzarte
+directories:
+  output: ../../release/app
+  buildResources: resources
+files:
+  - out/**
+  - resources/**
+  - package.json
+  - '!**/*.map'
+asar: true
+# Botão "Hospedar": o servidor (API compilada + LiveKit) vai junto, gerado por
+# `bun run package:server` (o `bun run package` da raiz faz os dois na ordem certa).
+extraResources:
+  - from: ../../release/accord-server
+    to: server
+    filter:
+      - '**/*'
+      - '!dados/**'
+# Fora do .asar: ícone da bandeja e módulos nativos (captura de som e ponte com o Windows).
+asarUnpack:
+  - resources/**
+  - '**/node_modules/loopback-capture/**'
+  - '**/node_modules/koffi/**'
+  - '**/node_modules/@koromix/**'
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.ico
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: Accord
+  artifactName: Accord-Setup-${version}.${ext}
+linux:
+  target: dir
+  icon: resources/icon.png
+# Atualização automática: precisa de um repositório no GitHub com Releases.
+publish: null
+# publish:
+#   provider: github
+#   owner: <usuario>
+#   repo: Accord

@@ -1,0 +1,8 @@
+{
+  "extends": "@sharescreen/config/tsconfig.base.json",
+  "compilerOptions": {
+    // URL existe tanto no Bun/Node quanto no navegador; a lib DOM dá o tipo.
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["src"]
+}

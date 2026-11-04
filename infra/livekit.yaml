@@ -1,0 +1,25 @@
+# Configuração local do LiveKit para desenvolvimento.
+# Uso: bun run livekit:dev   (na raiz; precisa do livekit-server no PATH ou em infra/bin)
+# Chaves do modo --dev: devkey / secret. NUNCA exponha este servidor na internet assim.
+
+port: 7880
+
+rtc:
+  tcp_port: 7881
+  # Porta UDP única (mux): simplifica o encaminhamento de portas no host mode.
+  udp_port: 7882
+  # Em LAN/VPN (Radmin, Tailscale) não descobrir IP público via STUN.
+  use_external_ip: false
+  # Para VPN, fixe o IP anunciado e filtre a interface. Exemplos:
+  # node_ip: 26.x.x.x            # IP do host no Radmin VPN
+  # ips:
+  #   includes: [26.0.0.0/8]     # Radmin
+  #   # includes: [100.64.0.0/10] # Tailscale
+
+logging:
+  level: info
+
+# webhook:
+#   api_key: devkey
+#   urls:
+#     - http://localhost:7870/livekit/webhook

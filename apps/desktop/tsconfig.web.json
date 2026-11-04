@@ -1,0 +1,4 @@
+{
+  "extends": "@sharescreen/config/tsconfig.react.json",
+  "include": ["src/renderer/**/*"]
+}
