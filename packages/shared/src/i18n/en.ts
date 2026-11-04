@@ -385,4 +385,5 @@ export const en: Messages = {
   'pill.chatUnread': 'Channel chat ({n} new)',
   'overlay.chatTitle': 'Show chat on screen',
   'overlay.chatText': 'During the call, messages scroll near the pill, like a livestream chat.',
+  'viewer.closing': 'Closing in {n} s…',
 }

@@ -262,8 +262,11 @@ export function registerIpcHandlers({
     lastCall = snapshot
     overlay.sendToPanel(IpcChannel.CallStateChanged, snapshot)
     people.send(IpcChannel.CallStateChanged, snapshot)
-    // Saiu da chamada: a lista de pessoas não tem mais o que mostrar.
-    if (snapshot.status === 'idle') people.hide()
+    // Saiu da chamada: a lista de pessoas e as transmissões abertas fecham juntas.
+    if (snapshot.status === 'idle') {
+      people.hide()
+      viewers.closeAll()
+    }
   })
   ipcMain.handle(IpcChannel.CallGetState, () => lastCall)
 

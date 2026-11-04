@@ -25,6 +25,11 @@ export class ViewerManager {
     })
   }
 
+  /** Saiu da chamada: nenhuma transmissão continua aberta na tela. */
+  closeAll(): void {
+    for (const win of this.windows.values()) if (!win.isDestroyed()) win.close()
+  }
+
   targetFor(webContentsId: number): ViewerTarget | null {
     return this.targets.get(webContentsId) ?? null
   }

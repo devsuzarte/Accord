@@ -387,4 +387,5 @@ export const ptBR = {
   'overlay.chatTitle': 'Mostrar o chat na tela',
   'overlay.chatText':
     'Durante a chamada, as mensagens aparecem rolando perto do pill, como no chat de uma live.',
+  'viewer.closing': 'Fechando em {n} s…',
 } as const

@@ -112,3 +112,8 @@ body {
 .viewer__button:hover {
   background: rgba(255, 255, 255, 0.14);
 }
+
+.viewer__closing {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}

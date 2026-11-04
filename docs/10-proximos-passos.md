@@ -141,6 +141,8 @@ Sem contas ainda: cada um digita um nome e entra no canal "Geral". É um atalho 
 | 9.6 | **Volume por pessoa** 0–200%: vozes pelo WebAudio (`webAudioMix`), ganho por pessoa | `shared/localVolumes.ts` |
 | 9.7 | Licença MIT e avisos de terceiros | `LICENSE`, `THIRD_PARTY_NOTICES.md` |
 
+**Correção 0.2.1:** sair da chamada fecha também as transmissões que você estava assistindo (antes a janela do viewer ficava aberta com a conexão própria), e o viewer fecha sozinho 4 s depois que a transmissão acaba ou quem transmitia sai.
+
 **Limites conhecidos da troca de host:**
 - Se for a **sua** internet que caiu (e não o host), o app não consegue diferenciar e, se você for o primeiro da fila, abre um servidor só seu. Quando a internet volta, entre de novo no canal do host.
 - Admins promovidos não passam para o host novo (o papel é por identidade); os silêncios "para todos" passam.

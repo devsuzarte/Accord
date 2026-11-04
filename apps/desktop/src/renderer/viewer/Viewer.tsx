@@ -157,6 +157,24 @@ export function Viewer() {
     }
   }, [])
 
+  // A transmissão acabou (ou a conexão caiu): a janela fecha sozinha em alguns segundos.
+  const [closingIn, setClosingIn] = useState<number | null>(null)
+  useEffect(() => {
+    if (phase !== 'ended' && phase !== 'error') return
+    let left = 4
+    const tick = () => {
+      setClosingIn(left)
+      if (left <= 0) window.close()
+      left -= 1
+    }
+    const first = setTimeout(tick, 0)
+    const timer = setInterval(tick, 1000)
+    return () => {
+      clearTimeout(first)
+      clearInterval(timer)
+    }
+  }, [phase])
+
   // "Mutar áudio (para mim)" na lista de pessoas vale para esta janela também.
   useEffect(() => {
     if (!target) return
@@ -230,6 +248,9 @@ export function Viewer() {
             <p>{t('viewer.ended', { name: target?.name ?? t('viewer.thisPersonLower') })}</p>
           )}
           {phase === 'error' && <p>{message}</p>}
+          {(phase === 'ended' || phase === 'error') && closingIn !== null && (
+            <p className="viewer__closing">{t('viewer.closing', { n: Math.max(0, closingIn) })}</p>
+          )}
         </div>
       )}
 
