@@ -1,0 +1,10 @@
+/* Página transparente sobre a tela compartilhada: só os marcadores aparecem. */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent !important;
+}

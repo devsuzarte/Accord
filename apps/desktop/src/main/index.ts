@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, powerMonitor } from 'electron'
+import { IpcChannel } from '@sharescreen/shared'
 import { HotkeyService } from './hotkeys'
 import { captureRendererLogs, setupLogging } from './logger'
 import { registerIpcHandlers } from './ipc'
@@ -7,10 +8,12 @@ import { OverlayManager } from './overlay/overlay-manager'
 import { DiscoveryService } from './network/discovery'
 import { HostService } from './network/host-service'
 import { SessionMirror } from './network/session-mirror'
+import { restrictPermissions } from './windows/permissions'
 import { ChatWindow } from './overlay/chat-window'
 import { PeopleWindow } from './overlay/people-window'
 import { SettingsStore } from './settings/settings-store'
 import { ShareService } from './share/share-service'
+import { PointerWindow } from './overlay/pointer-window'
 import { ViewerManager } from './share/viewer-manager'
 import { createTray } from './tray'
 import { InviteService } from './invites'
@@ -47,6 +50,7 @@ if (!app.requestSingleInstanceLock()) {
   const overlay = new OverlayManager({ defaultCorner: profile ? 'top-right' : 'top-left' })
   const hotkeys = new HotkeyService(overlay)
   const share = new ShareService(overlay)
+  const pointer = new PointerWindow(share)
   const viewers = new ViewerManager()
   let mirror: SessionMirror | null = null
   let host: HostService | null = null
@@ -70,12 +74,18 @@ if (!app.requestSingleInstanceLock()) {
     app.setAppUserModelId('com.devsuzarte.accord')
     const settings = new SettingsStore()
     overlay.create()
-    hotkeys.registerAll()
+    hotkeys.registerAll({
+      call: (command) => overlay.sendToPill(IpcChannel.CallCommand, command),
+      unlockMini: () => viewers.unlockAll(),
+    })
     share.register()
     const people = new PeopleWindow(overlay)
     const discovery = new DiscoveryService()
     const updater = new Updater(updatesEnabled(profile))
     const sessionMirror = new SessionMirror()
+    // Sobra de uma sessão anterior (o app fechou sem sair da call): nada fica guardado.
+    sessionMirror.clear()
+    restrictPermissions()
     const hostService = new HostService(sessionMirror)
     mirror = sessionMirror
     host = hostService
@@ -84,6 +94,7 @@ if (!app.requestSingleInstanceLock()) {
       overlay,
       hotkeys,
       share,
+      pointer,
       viewers,
       people,
       settings,
@@ -94,7 +105,7 @@ if (!app.requestSingleInstanceLock()) {
       mirror: sessionMirror,
       invites,
     })
-    const tray = createTray(overlay, profile, updater)
+    const tray = createTray(overlay, profile, updater, () => viewers.unlockAll())
     updater.onReady = tray.rebuild
     settings.onLanguageChange = tray.rebuild
     invites.register()
@@ -116,10 +127,19 @@ if (!app.requestSingleInstanceLock()) {
 
   // O app vive na bandeja: fechar janelas não encerra; só "Sair" encerra.
   app.on('window-all-closed', () => {})
+  // Sair hospedando: passa a sessão para o próximo da fila (avisando antes, para ser rápido)
+  // em vez de deixar todo mundo esperando a conexão cair.
+  let handedOff = false
+  app.on('before-quit', (event) => {
+    if (handedOff || !host || host.getState().status !== 'running') return
+    event.preventDefault()
+    handedOff = true
+    void host.stop('handoff').finally(() => app.quit())
+  })
   app.on('will-quit', () => {
     hotkeys.dispose()
     // O servidor aberto pelo botão Hospedar fecha junto com o app.
-    host?.stop()
+    host?.kill()
     mirror?.clear()
   })
 }

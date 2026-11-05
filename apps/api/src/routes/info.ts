@@ -3,7 +3,7 @@ import { Elysia } from 'elysia'
 import pkg from '../../package.json'
 import { env } from '../env'
 import { CHANNEL_NAME, ROOM, roomService } from '../services/livekit'
-import { hasPassword } from '../services/session'
+import { currentSession, hasPassword } from '../services/session'
 
 const serverId = crypto.randomUUID()
 
@@ -20,12 +20,24 @@ async function peopleIn(room: string): Promise<ChannelPerson[]> {
   }
 }
 
+/**
+ * Canal com senha: só o número de pessoas. Sem isso, qualquer um na mesma rede via quem está
+ * na call (nomes e fotos) sem precisar da senha.
+ */
+async function channel() {
+  const people = await peopleIn(ROOM)
+  return hasPassword()
+    ? { id: ROOM, name: CHANNEL_NAME, people: [], count: people.length }
+    : { id: ROOM, name: CHANNEL_NAME, people, count: people.length }
+}
+
 /** Cartão de visita do servidor: o app usa na lista de canais encontrados. */
 export const infoRoutes = new Elysia().get('/info', async (): Promise<ServerInfo> => ({
   id: serverId,
   name: env.serverName,
   version: pkg.version,
   port: env.port,
-  channels: [{ id: ROOM, name: CHANNEL_NAME, people: await peopleIn(ROOM) }],
+  channels: [await channel()],
   locked: hasPassword(),
+  session: currentSession(),
 }))

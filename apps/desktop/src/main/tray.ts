@@ -12,6 +12,7 @@ export function createTray(
   overlay: OverlayManager,
   profile?: string,
   updater?: Updater,
+  unlockMini?: () => void,
 ): { tray: Tray; rebuild: () => void } {
   const tray = new Tray(nativeImage.createFromPath(trayIconPath))
   tray.setToolTip(profile ? `Accord (${profile})` : 'Accord')
@@ -39,6 +40,7 @@ export function createTray(
           },
         },
         { label: tm('tray.openPanel'), click: () => overlay.openPanel('channels') },
+        ...(unlockMini ? [{ label: tm('tray.unlockMini'), click: unlockMini }] : []),
         { type: 'separator' },
         {
           label: tm('tray.help'),

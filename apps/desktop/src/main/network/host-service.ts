@@ -1,10 +1,11 @@
 import { execFileSync, spawn } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import type { ChildProcess } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { app, BrowserWindow } from 'electron'
-import { DEFAULT_API_PORT, IpcChannel } from '@sharescreen/shared'
-import type { HostAddress, HostStartOptions, HostState } from '@sharescreen/shared'
+import { app, BrowserWindow, session } from 'electron'
+import { DEFAULT_API_PORT, HOST_KEY_HEADER, IpcChannel } from '@sharescreen/shared'
+import type { HostAddress, HostStartOptions, HostState, HostStopMode } from '@sharescreen/shared'
 import type { SessionMirror } from './session-mirror'
 import { localInterfaces } from './interfaces'
 
@@ -35,9 +36,27 @@ export class HostService {
     addresses: [],
     error: null,
     locked: false,
+    invite: null,
   }
 
-  constructor(private readonly mirror: SessionMirror) {}
+  /**
+   * Chave aleatória que o app passa ao servidor que ele abre. Os pedidos do próprio app para
+   * 127.0.0.1 levam a chave (injetada abaixo); um site aberto no navegador não tem como.
+   */
+  private readonly hostKey = randomBytes(24).toString('base64url')
+
+  constructor(private readonly mirror: SessionMirror) {
+    const filter = {
+      urls: [`http://127.0.0.1:${DEFAULT_API_PORT}/*`, `http://localhost:${DEFAULT_API_PORT}/*`],
+    }
+    session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+      callback({ requestHeaders: { ...details.requestHeaders, [HOST_KEY_HEADER]: this.hostKey } })
+    })
+  }
+
+  private hostHeaders(extra: Record<string, string> = {}): Record<string, string> {
+    return { ...extra, [HOST_KEY_HEADER]: this.hostKey }
+  }
   private stderrTail = ''
   /** O próprio app pediu para parar (a saída do processo não é erro). */
   private stopping = false
@@ -69,15 +88,47 @@ export class HostService {
     try {
       const response = await fetch(`${LOCAL_URL}/session/password`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: this.hostHeaders({ 'content-type': 'application/json' }),
         body: JSON.stringify({ password }),
         signal: AbortSignal.timeout(3000),
       })
       if (!response.ok) return false
-      this.update({ locked: !!password })
+      const body = (await response.json().catch(() => ({}))) as { invite?: string | null }
+      this.update({ locked: !!password, invite: body.invite ?? null })
       return true
     } catch {
       return false
+    }
+  }
+
+  /** Link novo: os convites que já foram mandados param de funcionar. */
+  async rotateInvite(): Promise<HostState> {
+    try {
+      const response = await fetch(`${LOCAL_URL}/session/invite/rotate`, {
+        method: 'POST',
+        headers: this.hostHeaders(),
+        signal: AbortSignal.timeout(3000),
+      })
+      if (response.ok) {
+        const body = (await response.json()) as { invite?: string | null }
+        this.update({ invite: body.invite ?? null })
+      }
+    } catch {
+      /* fica a chave de antes */
+    }
+    return this.getState()
+  }
+
+  private async fetchInvite(): Promise<string | null> {
+    try {
+      const response = await fetch(`${LOCAL_URL}/session/invite`, {
+        headers: this.hostHeaders(),
+        signal: AbortSignal.timeout(1500),
+      })
+      if (!response.ok) return null
+      return ((await response.json()) as { invite?: string | null }).invite ?? null
+    } catch {
+      return null
     }
   }
 
@@ -88,6 +139,7 @@ export class HostService {
     if (!command) return this.update({ status: 'unavailable', error: null })
     const password = options.password?.trim() || ''
     if (password) command.env.SHARESCREEN_PASSWORD = password
+    command.env.SHARESCREEN_HOST_KEY = this.hostKey
     if (options.restore && this.mirror.hasCopy()) {
       // Migração: o servidor novo continua a sessão a partir da cópia deste PC.
       this.mirror.pause()
@@ -121,7 +173,7 @@ export class HostService {
       console.info(`[hospedar] servidor encerrou (código ${code})`)
       if (this.stopping) {
         this.stopping = false
-        this.update({ status: 'stopped', error: null, locked: false })
+        this.update({ status: 'stopped', error: null, locked: false, invite: null })
         return
       }
       const inUse = /EADDRINUSE|address already in use|port.*in use/i.test(this.stderrTail)
@@ -133,18 +185,46 @@ export class HostService {
     const deadline = Date.now() + 20_000
     while (this.child === child && Date.now() < deadline) {
       if (await this.isUp()) {
-        this.update({ status: 'running', error: null, locked: await this.isLocked() })
+        this.update({
+          status: 'running',
+          error: null,
+          locked: await this.isLocked(),
+          invite: await this.fetchInvite(),
+        })
         return
       }
       await new Promise((r) => setTimeout(r, 400))
     }
     if (this.child === child) {
-      this.stop()
+      this.kill()
       this.update({ status: 'error', error: 'timeout' })
     }
   }
 
-  stop(): void {
+  /**
+   * Parar de hospedar. `end` (padrão): o servidor apaga a sala antes de fechar, então todo mundo
+   * sai na hora com o aviso "o host encerrou", sem ficar tentando reconectar. `handoff`: avisa
+   * a sala que o host vai sair e espera um pouco para o primeiro da fila puxar a cópia da sessão.
+   */
+  async stop(mode: HostStopMode = 'end'): Promise<void> {
+    const child = this.child
+    if (!child?.pid) return
+    try {
+      await fetch(`${LOCAL_URL}/session/end`, {
+        method: 'POST',
+        headers: this.hostHeaders({ 'content-type': 'application/json' }),
+        body: JSON.stringify({ mode }),
+        signal: AbortSignal.timeout(2000),
+      })
+      await new Promise((r) => setTimeout(r, mode === 'handoff' ? 2500 : 400))
+    } catch {
+      // O servidor já não respondia: fecha assim mesmo.
+    }
+    this.kill()
+  }
+
+  /** Fecha o processo na hora (saída do app ou servidor que não abriu). */
+  kill(): void {
     const child = this.child
     if (!child?.pid) return
     this.stopping = true

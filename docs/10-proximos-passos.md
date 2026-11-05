@@ -5,8 +5,8 @@ O layout do pill e do painel está **aprovado**. Este documento reorganiza o [ro
 Cada marco termina com algo que dá para **usar e mostrar**. Tamanhos relativos: P (pequeno), M (médio), G (grande).
 
 ```
- M1 Ligação ─► M2 Tela ─► M5 Som do app ─► M6 Entrega ─► M7 Moderação ─► M8 Hospedar, achar e idiomas ─► M9 Chat, senha e troca de host ─► M10 Convites e qualidade     M3 Contas
-     ✅          ✅           ✅              ✅            ✅               ✅                              ✅                                 ✅                ⏸ adiado
+ M1 Ligação ─► M2 Tela ─► M5 Som do app ─► M6 Entrega ─► M7 Moderação ─► M8 Hospedar, achar e idiomas ─► M9 Chat, senha e troca de host ─► M10 Convites e qualidade ─► M11 Segurança e jogo     M3 Contas
+     ✅          ✅           ✅              ✅            ✅               ✅                              ✅                                 ✅                         ✅                ⏸ adiado
 ```
 
 > **Decisão (03/11/2026):** M3 e M4 foram adiados. (Os convites por link do M4 saíram no M10, em 04/11/2026.) A entrada continua aberta só com um nome (`POST /join`, desligável com `OPEN_JOIN=false`), e a porta padrão passou a ser **7870**. O servidor é distribuído como um pacote de um clique, que sobe o LiveKit junto.
@@ -152,6 +152,31 @@ Sem contas ainda: cada um digita um nome e entra no canal "Geral". É um atalho 
 - Admins promovidos não passam para o host novo (o papel é por identidade); os silêncios "para todos" passam.
 - Mensagens enviadas nos últimos segundos antes da queda podem faltar para quem não as recebeu.
 - Só funciona se o app de quem assume puder hospedar (firewall liberado e o servidor junto no instalador).
+
+## M11 — Segurança, fim da sessão, aperte-para-falar, apontar e miniatura (M) · ✅ implementado (05/11/2026)
+
+> Testado com três instâncias. **Encerrar para todos**: os outros saíram em menos de 0,4 s com "O host encerrou a sessão" (antes ficavam reconectando por quase um minuto). **Passar o host**: o próximo da fila virou host e todos estavam nele em 5 s, com a mesma chave de convite. **Aperte para falar** (voz de teste num arquivo): o outro lado viu a pessoa falando 0 de 24 vezes sem segurar e 24 de 24 segurando. **Apontar**: o clique no viewer apareceu na tela de quem transmite (na posição certa, com o nome) e no vídeo de quem assiste. **Miniatura**: 480×270 no canto, sempre no topo, sem pegar foco; travar, transparência e tamanho funcionaram.
+
+| # | O que | Onde |
+|---|---|---|
+| 11.1 | **Parar de hospedar com gente na call** pergunta: **Encerrar para todos** (o servidor apaga a sala e todos saem na hora) ou **Passar o host para {nome}** (avisa a sala, o próximo puxa a cópia da sessão e assume em segundos). Sair do app hospedando = passar o host | `main/network/host-service.ts` (`stop('end' \| 'handoff')`), `POST /session/end`, `panel/ChannelsTab.tsx` |
+| 11.2 | **Reconexão sem esperar à toa**: se a conexão cai e a API do host não responde em 4 s, larga a sala e parte para a migração (antes o LiveKit tentava por ~50 s). O LiveKit agora morre junto com a API (`SIGKILL`; com SIGTERM ele esperava a sala esvaziar) | `pill/call/callStore.ts`, `apps/api/src/managed-livekit.ts` |
+| 11.3 | **Auditoria de segurança** e correções: ver [14-seguranca.md](14-seguranca.md) | API e app |
+| 11.4 | **Atalhos de voz** escolhidos pela pessoa: mutar, ensurdecer, **aperte para falar** (segurar) e destravar a miniatura. No Windows são lidos com `GetAsyncKeyState` (koffi): a tecla continua indo para o jogo e os botões laterais do mouse valem. Fora do Windows, só mutar/ensurdecer | `main/hotkeys.ts`, `panel/VoiceShortcuts.tsx`, `packages/shared/src/keys.ts` |
+| 11.5 | No aperte-para-falar o microfone continua publicado e manda silêncio fora do atalho (`track.enabled`): sem atraso para abrir e sem o ícone de mudo piscando para os outros. Selo **PTT** no pill, aceso enquanto segura; atraso ao soltar ajustável | `pill/call/callStore.ts` |
+| 11.6 | **Apontar na tela**: clique no vídeo do viewer → `POST /pointer` (o servidor confere quem é e limita a frequência) → marcador com nome na tela de quem transmite (janela transparente que não entra na transmissão) e no vídeo de quem assiste. Dá para desligar em Overlay | `routes/pointer.ts`, `main/overlay/pointer-window.ts`, `renderer/pointer/` |
+| 11.7 | **Miniatura sobre o jogo**: botão no viewer. Janela sem moldura no canto, sempre no topo, sem pegar o foco do jogo e fora da transmissão. Arrastar pela barra, 3 tamanhos, transparência e **travar** (o clique atravessa; destrava pelo atalho ou pela bandeja) | `main/share/viewer-manager.ts`, `windows/viewer.ts`, `renderer/viewer/Viewer.tsx` |
+
+**Limites:** [Hipótese] jogos em tela cheia exclusiva podem cobrir a miniatura e os marcadores (como o pill); em tela cheia sem bordas funcionam. [Hipótese] jogo rodando como administrador pode esconder o teclado do Accord (aperte-para-falar não responde); abrir o Accord como administrador resolve. Apontar numa **janela** transmitida usa a posição da janela no Windows; fora do Windows só funciona na tela inteira.
+
+### Para testar no Windows (M11)
+- [ ] Parar de hospedar com amigos na call: "Encerrar para todos" tira todo mundo na hora; "Passar o host" leva todos para o próximo
+- [ ] Aperte para falar com uma tecla e com o botão lateral do mouse, com um jogo em primeiro plano (a tecla continua funcionando no jogo)
+- [ ] Mutar/ensurdecer pelos atalhos com o jogo em foco
+- [ ] Apontar numa tela inteira e numa janela (o marcador cai no lugar certo, inclusive com escala de 125%/150% no Windows)
+- [ ] Miniatura sobre um jogo em tela cheia sem bordas; travar e destravar pelo atalho
+
+---
 
 ## M10 — Build no GitHub, convites por link e qualidade no viewer (M) · ✅ implementado (04/11/2026)
 

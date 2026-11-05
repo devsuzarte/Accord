@@ -4,6 +4,7 @@ import {
   CHAT_MAX_FILE_BYTES,
   CHAT_MAX_TEXT,
   PASSWORD_HEADER,
+  isBlockedFile,
 } from '@sharescreen/shared'
 import { Avatar, colorFor, useReportSize } from '@sharescreen/ui'
 import { FileText, Image as ImageIcon, Minimize2, Paperclip, SendHorizontal, X } from 'lucide-react'
@@ -115,6 +116,12 @@ function ExpandedChat({ state }: { state: ChatState }) {
       setError(t('chat.err.tooLarge'))
       return
     }
+    // Programas e scripts não vão pelo chat (é o jeito mais comum de passar vírus).
+    const blocked = list.find((f) => isBlockedFile(f.name))
+    if (blocked) {
+      setError(t('chat.err.blocked', { name: blocked.name }))
+      return
+    }
     setError(null)
     setPending((current) => {
       const next = [...current, ...list]
@@ -153,7 +160,11 @@ function ExpandedChat({ state }: { state: ChatState }) {
               ? t('chat.err.tooLarge')
               : body?.error === 'session-full'
                 ? t('chat.err.full')
-                : t('chat.err.send'),
+                : body?.error === 'blocked-file'
+                  ? t('chat.err.blocked', { name: file.name })
+                  : body?.error === 'slow-down'
+                    ? t('chat.err.slowDown')
+                    : t('chat.err.send'),
           )
         }
         ids.push(((await response.json()) as ChatAttachment).id)
@@ -163,7 +174,9 @@ function ExpandedChat({ state }: { state: ChatState }) {
         headers: { ...auth, 'content-type': 'application/json' },
         body: JSON.stringify({ text: text.slice(0, CHAT_MAX_TEXT), attachments: ids }),
       })
-      if (!response.ok) throw new Error(t('chat.err.send'))
+      if (!response.ok) {
+        throw new Error(response.status === 429 ? t('chat.err.slowDown') : t('chat.err.send'))
+      }
       setText('')
       setPending([])
       stick.current = true

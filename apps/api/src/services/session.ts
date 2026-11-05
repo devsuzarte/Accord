@@ -1,4 +1,4 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import {
   copyFileSync,
   existsSync,
@@ -16,7 +16,7 @@ import type {
   SessionError,
   SessionSnapshot,
 } from '@sharescreen/shared'
-import { CHAT_MAX_FILE_BYTES } from '@sharescreen/shared'
+import { CHAT_MAX_FILE_BYTES, INVITE_PREFIX, isBlockedFile } from '@sharescreen/shared'
 import { env } from '../env'
 import { exportBlocks, importBlocks } from './roles'
 
@@ -30,10 +30,17 @@ import { exportBlocks, importBlocks } from './roles'
 const MAX_MESSAGES = 1000
 const MAX_SESSION_BYTES = 300 * 1024 * 1024
 
-const dir = join(tmpdir(), `accord-sessao-${env.port}`)
+export const sessionDir = join(tmpdir(), `accord-sessao-${env.port}`)
+const dir = sessionDir
 const filesDir = join(dir, 'arquivos')
 
-let password: string | null = process.env.SHARESCREEN_PASSWORD?.trim() || null
+/** A senha nunca fica em texto: só o hash (scrypt), que também é o que vai na cópia da sessão. */
+type PasswordHash = { salt: string; hash: string }
+let password: PasswordHash | null = hashPassword(process.env.SHARESCREEN_PASSWORD)
+/** Chave dos links de convite: entra sem saber a senha. Muda quando a senha muda. */
+let inviteKey: string | null = password ? newKey() : null
+/** Mesma sessão depois da troca de host (a cópia leva o id junto). */
+let sessionId = newKey()
 const messages: ChatMessage[] = []
 const files = new Map<string, ChatAttachment & { file: string }>()
 let totalBytes = 0
@@ -47,26 +54,59 @@ process.on('exit', () => rmSync(dir, { recursive: true, force: true }))
 
 // ───────────────────────── Senha ─────────────────────────
 
+function newKey(): string {
+  return randomBytes(18).toString('base64url')
+}
+
+function hashPassword(plain: string | null | undefined, salt?: string): PasswordHash | null {
+  const clean = plain?.trim()
+  if (!clean) return null
+  const s = salt ?? randomBytes(16).toString('base64url')
+  return { salt: s, hash: scryptSync(clean, s, 32).toString('base64url') }
+}
+
+function same(a: string, b: string): boolean {
+  const x = Buffer.from(a)
+  const y = Buffer.from(b)
+  return x.length === y.length && timingSafeEqual(x, y)
+}
+
 export function hasPassword(): boolean {
   return !!password
 }
 
-export function currentPassword(): string | null {
-  return password
+export function currentSession(): string {
+  return sessionId
+}
+
+export function currentInvite(): string | null {
+  return inviteKey
+}
+
+/** Gera uma chave nova: os links antigos param de funcionar (quem já está na call fica). */
+export function rotateInvite(): string | null {
+  inviteKey = password ? newKey() : null
+  return inviteKey
 }
 
 export function setPassword(next: string | null): void {
-  password = next?.trim() || null
+  password = hashPassword(next)
+  rotateInvite()
   console.log(password ? '[sessão] canal com senha' : '[sessão] canal sem senha')
 }
 
-/** Confere a senha mandada no cabeçalho. `null` = pode entrar. */
+/**
+ * Confere o que veio no cabeçalho da senha: a senha ou `invite:<chave>` (link de convite).
+ * `null` = pode entrar.
+ */
 export function checkPassword(given: string | null | undefined): SessionError | null {
   if (!password) return null
   if (!given) return 'password-required'
-  const a = Buffer.from(given)
-  const b = Buffer.from(password)
-  return a.length === b.length && timingSafeEqual(a, b) ? null : 'wrong-password'
+  if (given.startsWith(INVITE_PREFIX) && inviteKey) {
+    if (same(given.slice(INVITE_PREFIX.length), inviteKey)) return null
+  }
+  const attempt = hashPassword(given, password.salt)
+  return attempt && same(attempt.hash, password.hash) ? null : 'wrong-password'
 }
 
 // ───────────────────────── Anexos ─────────────────────────
@@ -95,6 +135,7 @@ export function addFile(
   bytes: Uint8Array,
 ): ChatAttachment | SessionError {
   if (bytes.byteLength === 0 || bytes.byteLength > CHAT_MAX_FILE_BYTES) return 'too-large'
+  if (isBlockedFile(name)) return 'blocked-file'
   if (totalBytes + bytes.byteLength > MAX_SESSION_BYTES) return 'session-full'
   const id = randomBytes(18).toString('base64url')
   const file = join(filesDir, id)
@@ -154,9 +195,11 @@ export function history(): ChatMessage[] {
 
 export function snapshot(): SessionSnapshot {
   return {
-    version: 1,
+    version: 2,
     savedAt: Date.now(),
     password,
+    invite: inviteKey,
+    session: sessionId,
     messages,
     files: [...files.values()].map(publicAttachment),
     blocks: exportBlocks(),
@@ -169,11 +212,19 @@ export function snapshot(): SessionSnapshot {
  */
 export function restoreFrom(restoreDir: string): void {
   try {
-    const saved = JSON.parse(
-      readFileSync(join(restoreDir, 'snapshot.json'), 'utf8'),
-    ) as SessionSnapshot
-    if (saved.version !== 1) return
-    password = saved.password
+    const saved = JSON.parse(readFileSync(join(restoreDir, 'snapshot.json'), 'utf8')) as
+      | SessionSnapshot
+      | (Omit<SessionSnapshot, 'version' | 'password'> & { version: 1; password: string | null })
+    if (saved.version === 1) {
+      // Cópia de uma versão anterior (senha em texto).
+      password = hashPassword(saved.password)
+    } else if (saved.version === 2) {
+      password = saved.password && typeof saved.password.salt === 'string' ? saved.password : null
+      if (typeof saved.session === 'string' && saved.session) sessionId = saved.session
+    } else {
+      return
+    }
+    inviteKey = password ? (saved.version === 2 && saved.invite) || newKey() : null
     importBlocks(saved.blocks ?? {})
     for (const attachment of saved.files ?? []) {
       const source = join(restoreDir, 'arquivos', attachment.id)

@@ -14,6 +14,8 @@ const initial: CallSnapshot = {
   sharing: null,
   channelName: null,
   server: null,
+  successor: null,
+  pushToTalk: null,
   participants: [],
   error: null,
 }

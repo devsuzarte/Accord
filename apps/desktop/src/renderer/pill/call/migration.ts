@@ -1,4 +1,4 @@
-import { DEFAULT_API_PORT } from '@sharescreen/shared'
+import { DEFAULT_API_PORT, isPrivateIPv4 } from '@sharescreen/shared'
 import type { Participant, Room } from 'livekit-client'
 
 /**
@@ -27,7 +27,8 @@ export function successionOf(room: Room): Successor[] {
     addresses: (p.attributes.addrs ?? '')
       .split(',')
       .map((a) => a.trim())
-      .filter((a) => /^\d{1,3}(\.\d{1,3}){3}$/.test(a)),
+      // Só redes de casa/VPN: a migração nunca leva todo mundo para um IP da internet.
+      .filter(isPrivateIPv4),
   }))
 }
 
@@ -54,6 +55,8 @@ export async function waitForServer(
   previousHost: string,
   timeoutMs: number,
   cancelled: () => boolean,
+  /** Só aceita um servidor que continua a mesma sessão (mesmo id em /info). */
+  session: string,
 ): Promise<string | null> {
   const previous = new URL(previousHost).hostname
   const sameNet = (a: string) => a.split('.')[0] === previous.split('.')[0]
@@ -65,6 +68,8 @@ export async function waitForServer(
         const url = `http://${address}:${DEFAULT_API_PORT}`
         const response = await fetch(`${url}/info`, { signal: AbortSignal.timeout(1500) })
         if (!response.ok) throw new Error('não')
+        const info = (await response.json()) as { session?: string }
+        if (session && info.session !== session) throw new Error('outra sessão')
         return url
       }),
     ).catch(() => null)

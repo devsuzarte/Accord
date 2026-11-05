@@ -288,3 +288,95 @@ body {
   font-size: var(--font-size-xs);
   color: var(--text-muted);
 }
+
+.viewer__bar[hidden] {
+  display: none;
+}
+
+/* Clique na transmissão = apontar. */
+.viewer[data-chrome] .viewer__video {
+  cursor: crosshair;
+}
+
+.viewer__pings {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* ── Miniatura sobre o jogo ─────────────────────────── */
+
+.viewer[data-mini] {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.mini__bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 6px 14px 10px;
+  background: linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+  color: var(--text-strong);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity var(--dur-normal) var(--ease-out);
+  user-select: none;
+}
+
+.viewer[data-chrome] .mini__bar {
+  opacity: 1;
+}
+
+.mini__bar:active {
+  cursor: grabbing;
+}
+
+.mini__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini__opacity {
+  width: 64px;
+  accent-color: var(--brand);
+}
+
+.mini__button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--text-strong);
+}
+
+.mini__button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.mini__button:focus-visible {
+  outline: 2px solid var(--brand);
+}
+
+.mini__lock {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--text-strong);
+  opacity: 0.7;
+}

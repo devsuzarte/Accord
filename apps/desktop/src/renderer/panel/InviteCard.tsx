@@ -1,4 +1,4 @@
-import { shortServerAddress } from '@sharescreen/shared'
+import { inviteSecret, isPrivateIPv4, shortServerAddress } from '@sharescreen/shared'
 import type { CallSnapshot, Invite, Profile } from '@sharescreen/shared'
 import { Link2, Loader, Lock, LogIn } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -52,12 +52,12 @@ export function InviteCard({
       window.platform.call.command({ type: 'leave' })
       return
     }
-    onJoin(result.server.url, invite.password)
+    onJoin(result.server.url, inviteSecret(invite))
   }
 
   useEffect(() => {
     if (!waitingLeave || call.status !== 'idle') return
-    const timer = setTimeout(() => onJoin(invite.serverUrl, invite.password), 0)
+    const timer = setTimeout(() => onJoin(invite.serverUrl, inviteSecret(invite)), 0)
     return () => clearTimeout(timer)
   }, [waitingLeave, call.status, invite, onJoin])
 
@@ -70,10 +70,13 @@ export function InviteCard({
         {invite.name ? t('invite.from', { name: invite.name }) : address}
         {invite.name && <span className="invite__address">{address}</span>}
       </p>
-      {invite.password && (
+      {(invite.key || invite.password) && (
         <p className="invite__note">
           <Lock size={12} aria-hidden /> {t('invite.withPassword')}
         </p>
+      )}
+      {!isPrivateIPv4(new URL(invite.serverUrl).hostname) && (
+        <p className="notice notice--warn">{t('invite.publicAddress')}</p>
       )}
       {error && <p className="notice notice--error">{error}</p>}
       <div className="invite__actions">

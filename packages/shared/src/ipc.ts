@@ -55,6 +55,12 @@ export const IpcChannel = {
   ViewerOpen: 'viewer:open',
   /** viewer → main: quem esta janela deve mostrar. */
   ViewerGetTarget: 'viewer:get-target',
+  ViewerToggleMini: 'viewer:toggle-mini',
+  ViewerMiniSet: 'viewer:mini-set',
+  ViewerMiniState: 'viewer:mini-state',
+  ViewerMiniSize: 'viewer:mini-size',
+  ViewerDrag: 'viewer:drag',
+  ViewerPoint: 'viewer:point',
 
   /** pill → main: abrir/fechar a janela com a lista de pessoas. */
   PeopleToggle: 'people:toggle',
@@ -83,6 +89,7 @@ export const IpcChannel = {
   HostGetState: 'host:get-state',
   HostStart: 'host:start',
   HostStop: 'host:stop',
+  HostRotateInvite: 'host:rotate-invite',
   HostStateChanged: 'host:state-changed',
   HostSetPassword: 'host:set-password',
   ChatReport: 'chat:report',
@@ -100,6 +107,13 @@ export const IpcChannel = {
   InviteReceived: 'invite:received',
   InviteTake: 'invite:take',
   SessionSaveMessages: 'session:save-messages',
+  SessionMirrorNow: 'session:mirror-now',
+  PointerShow: 'pointer:show',
+  PointerPing: 'pointer:ping',
+  VoiceHotkeysGet: 'hotkeys:voice-get',
+  VoiceHotkeysSet: 'hotkeys:voice-set',
+  VoiceHotkeysChanged: 'hotkeys:voice-changed',
+  VoiceHotkeyCapture: 'hotkeys:capture',
 } as const
 
 export type IpcChannel = (typeof IpcChannel)[keyof typeof IpcChannel]
@@ -143,6 +157,30 @@ export interface HotkeyInfo {
   id: 'toggle-overlay' | 'toggle-ghost'
   accelerator: string
   registered: boolean
+}
+
+/**
+ * Atalho escolhido pela pessoa: teclas (códigos virtuais do Windows, VK_*) que precisam estar
+ * apertadas juntas. Botões laterais do mouse também valem (VK_XBUTTON1/2, VK_MBUTTON).
+ */
+export interface KeyBinding {
+  keys: number[]
+  /** Texto para mostrar ("Ctrl + Shift + M", "Mouse 4"). */
+  label: string
+  /** Mesmo atalho no formato do Electron, para fora do Windows (sem mouse). */
+  accelerator: string | null
+}
+
+export type BindingId = 'mute' | 'deafen' | 'ptt' | 'unlockMini'
+
+export interface VoiceHotkeys {
+  /** voice = microfone aberto (detecção de voz); ptt = só fala enquanto segura o atalho. */
+  voiceMode: 'voice' | 'ptt'
+  /** Quanto tempo o microfone fica aberto depois de soltar (evita cortar o fim da frase). */
+  pttReleaseMs: number
+  bindings: Record<BindingId, KeyBinding | null>
+  /** O Windows deixa ler o teclado e o mouse sem roubar a tecla do jogo (push-to-talk). */
+  holdSupported: boolean
 }
 
 /** Como a janela de chat aparece: aberta (com o campo de texto) ou mínima (só as mensagens rolando). */

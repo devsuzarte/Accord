@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import { tm } from '../i18n'
 import {
   app,
@@ -9,6 +10,7 @@ import {
   webContents,
 } from 'electron'
 import type { MessagePortMain } from 'electron'
+import type Koffi from 'koffi'
 import { IpcChannel } from '@sharescreen/shared'
 import type {
   ShareAudioResult,
@@ -39,6 +41,8 @@ export class ShareService {
   private picker: BrowserWindow | null = null
   /** Fonte confirmada no seletor, aguardando o getDisplayMedia do pill. */
   private pendingSourceId: string | null = null
+  /** O que está sendo transmitido agora (para os marcadores saberem onde aparecer). */
+  private activeSource: { id: string; displayId: string } | null = null
   private readonly audio = new NativeShareAudio()
   private audioPort: MessagePortMain | null = null
 
@@ -66,6 +70,7 @@ export class ShareService {
         const source = sources.find((s) => s.id === sourceId)
         if (!source) console.warn(`[share] fonte ${sourceId} não existe mais (janela fechada?)`)
         else console.info(`[share] capturando "${source.name}"`)
+        if (source) this.activeSource = { id: source.id, displayId: source.display_id }
         callback(source ? { video: source } : {})
       } catch (error) {
         console.error('[share] falha ao listar fontes', error)
@@ -155,8 +160,39 @@ export class ShareService {
 
   select(request: ShareRequest): void {
     this.pendingSourceId = request.sourceId
+    this.activeSource = { id: request.sourceId, displayId: '' }
+    // Qual monitor é essa tela (para os marcadores aparecerem no monitor certo).
+    if (request.sourceId.startsWith('screen:')) {
+      void desktopCapturer
+        .getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } })
+        .then((sources) => {
+          const found = sources.find((s) => s.id === request.sourceId)
+          if (found && this.activeSource?.id === request.sourceId) {
+            this.activeSource = { id: found.id, displayId: found.display_id }
+          }
+        })
+        .catch(() => undefined)
+    }
     this.closePicker()
     this.overlay.sendToPill(IpcChannel.ShareStart, request)
+  }
+
+  /**
+   * Retângulo (em pixels de tela do Electron) do que está sendo transmitido: a tela inteira ou
+   * a janela escolhida. `null` quando não dá para saber (janela fora do Windows).
+   */
+  captureBounds(): Electron.Rectangle | null {
+    const source = this.activeSource
+    if (!source) return null
+    if (source.id.startsWith('screen:')) {
+      const displays = screen.getAllDisplays()
+      const display =
+        displays.find((d) => String(d.id) === source.displayId) ??
+        (displays.length === 1 ? displays[0] : undefined)
+      return display?.bounds ?? null
+    }
+    const hwnd = Number(source.id.split(':')[1])
+    return Number.isFinite(hwnd) ? windowBounds(hwnd) : null
   }
 
   // ───────────────────────── Som ─────────────────────────
@@ -195,4 +231,44 @@ export class ShareService {
     this.audioPort?.close()
     this.audioPort = null
   }
+}
+
+let dwmBounds: ((hwnd: number) => Electron.Rectangle | null) | null | undefined
+
+/** Windows: limites visíveis da janela (DwmGetWindowAttribute, sem a sombra invisível). */
+function windowBounds(hwnd: number): Electron.Rectangle | null {
+  if (process.platform !== 'win32') return null
+  if (dwmBounds === undefined) {
+    try {
+      const koffi = createRequire(__filename)('koffi') as typeof Koffi
+      const RECT = koffi.struct('ACCORD_RECT', {
+        left: 'int32',
+        top: 'int32',
+        right: 'int32',
+        bottom: 'int32',
+      })
+      const dwm = koffi.load('dwmapi.dll')
+      const DwmGetWindowAttribute = dwm.func(
+        'int32 __stdcall DwmGetWindowAttribute(intptr hwnd, uint32 attr, _Out_ ACCORD_RECT *rect, uint32 size)',
+      )
+      const DWMWA_EXTENDED_FRAME_BOUNDS = 9
+      dwmBounds = (h) => {
+        const rect = { left: 0, top: 0, right: 0, bottom: 0 }
+        if (DwmGetWindowAttribute(h, DWMWA_EXTENDED_FRAME_BOUNDS, rect, koffi.sizeof(RECT)) !== 0) {
+          return null
+        }
+        // DWM devolve pixels físicos; o Electron trabalha em pixels "lógicos" (DIP).
+        return screen.screenToDipRect(null, {
+          x: rect.left,
+          y: rect.top,
+          width: rect.right - rect.left,
+          height: rect.bottom - rect.top,
+        })
+      }
+    } catch (error) {
+      console.warn('[share] não consigo ler a posição da janela transmitida', error)
+      dwmBounds = null
+    }
+  }
+  return dwmBounds ? dwmBounds(hwnd) : null
 }

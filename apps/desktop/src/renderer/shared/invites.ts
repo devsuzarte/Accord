@@ -14,8 +14,8 @@ export function sortAddresses(addresses: HostAddress[]): HostAddress[] {
 }
 
 /** Link de convite para um endereço específico deste PC (aba Hospedar). */
-export function inviteFor(address: string, name: string, password: string | null): string {
-  return inviteLinks({ serverUrl: normalizeServerUrl(address), name, password }).web
+export function inviteFor(address: string, name: string, key: string | null): string {
+  return inviteLinks({ serverUrl: normalizeServerUrl(address), name, key }).web
 }
 
 /**
@@ -33,5 +33,7 @@ export async function inviteForCall(
     const port = new URL(serverUrl).port || String(DEFAULT_API_PORT)
     serverUrl = normalizeServerUrl(`${pick.address}:${port}`)
   }
-  return inviteLinks({ serverUrl, name: server.name, password: server.password }).web
+  // Canal com senha mas sem chave (servidor antigo): melhor não gerar um link que não entra.
+  if (server.locked && !server.invite) return null
+  return inviteLinks({ serverUrl, name: server.name, key: server.invite }).web
 }

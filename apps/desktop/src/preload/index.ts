@@ -51,6 +51,10 @@ const platform: PlatformBridge = {
   },
   hotkeys: {
     list: () => ipcRenderer.invoke(IpcChannel.HotkeysList),
+    voice: () => ipcRenderer.invoke(IpcChannel.VoiceHotkeysGet),
+    setVoice: (patch) => ipcRenderer.invoke(IpcChannel.VoiceHotkeysSet, patch),
+    onVoiceChange: (listener) => subscribe(IpcChannel.VoiceHotkeysChanged, listener),
+    capturing: (active) => ipcRenderer.send(IpcChannel.VoiceHotkeyCapture, active),
   },
   call: {
     command: (command) => ipcRenderer.send(IpcChannel.CallCommand, command),
@@ -71,6 +75,11 @@ const platform: PlatformBridge = {
   viewer: {
     open: (target) => ipcRenderer.send(IpcChannel.ViewerOpen, target),
     getTarget: () => ipcRenderer.invoke(IpcChannel.ViewerGetTarget),
+    toggleMini: () => ipcRenderer.send(IpcChannel.ViewerToggleMini),
+    setMini: (patch) => ipcRenderer.send(IpcChannel.ViewerMiniSet, patch),
+    onMiniState: (listener) => subscribe(IpcChannel.ViewerMiniState, listener),
+    cycleMiniSize: () => ipcRenderer.send(IpcChannel.ViewerMiniSize),
+    drag: (phase) => ipcRenderer.send(IpcChannel.ViewerDrag, phase),
   },
   people: {
     toggle: () => ipcRenderer.send(IpcChannel.PeopleToggle),
@@ -100,7 +109,8 @@ const platform: PlatformBridge = {
     getState: () => ipcRenderer.invoke(IpcChannel.HostGetState),
     start: (options) => ipcRenderer.invoke(IpcChannel.HostStart, options),
     setPassword: (password) => ipcRenderer.invoke(IpcChannel.HostSetPassword, password),
-    stop: () => ipcRenderer.send(IpcChannel.HostStop),
+    stop: (mode) => ipcRenderer.send(IpcChannel.HostStop, mode ?? 'end'),
+    rotateInvite: () => ipcRenderer.invoke(IpcChannel.HostRotateInvite),
     onChange: (listener) => subscribe<HostState>(IpcChannel.HostStateChanged, listener),
   },
   update: {
@@ -125,6 +135,11 @@ const platform: PlatformBridge = {
   session: {
     mirror: (request) => ipcRenderer.send(IpcChannel.SessionMirror, request),
     saveMessages: (messages) => ipcRenderer.invoke(IpcChannel.SessionSaveMessages, messages),
+    mirrorNow: () => ipcRenderer.invoke(IpcChannel.SessionMirrorNow),
+  },
+  pointer: {
+    show: (ping) => ipcRenderer.send(IpcChannel.PointerShow, ping),
+    onPing: (listener) => subscribe(IpcChannel.PointerPing, listener),
   },
   invite: {
     take: () => ipcRenderer.invoke(IpcChannel.InviteTake),

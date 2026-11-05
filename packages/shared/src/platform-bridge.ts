@@ -5,6 +5,7 @@ import type {
   ChatMode,
   ChatPrefs,
   HotkeyInfo,
+  VoiceHotkeys,
   OverlayCorner,
   OverlayState,
   PanelTab,
@@ -28,6 +29,9 @@ import type {
   Theme,
   UpdateState,
   ViewerTarget,
+  MiniViewerState,
+  HostStopMode,
+  PointerPing,
 } from './types'
 
 type Unsubscribe = () => void
@@ -62,6 +66,16 @@ export interface PlatformBridge {
   }
   hotkeys: {
     list(): Promise<HotkeyInfo[]>
+    /** Mutar, ensurdecer, push-to-talk e destravar a miniatura. */
+    voice(): Promise<VoiceHotkeys>
+    /** Painel: salva (só o que veio). */
+    setVoice(patch: Partial<Omit<VoiceHotkeys, 'holdSupported'>>): Promise<VoiceHotkeys>
+    onVoiceChange(listener: (hotkeys: VoiceHotkeys) => void): Unsubscribe
+    /**
+     * Painel: enquanto escolhe um atalho, os atalhos param de funcionar (senão apertar a tecla
+     * de mutar para escolhê-la já mutava).
+     */
+    capturing(active: boolean): void
   }
   call: {
     /** Painel: pede ao pill para entrar/sair. */
@@ -97,6 +111,15 @@ export interface PlatformBridge {
     open(target: ViewerTarget): void
     /** Viewer: quem esta janela mostra. */
     getTarget(): Promise<ViewerTarget | null>
+    /** Viewer: vira miniatura sobre o jogo (ou volta a ser janela). */
+    toggleMini(): void
+    /** Miniatura: travar (clique atravessa) e transparência. */
+    setMini(patch: Partial<MiniViewerState>): void
+    onMiniState(listener: (state: MiniViewerState) => void): Unsubscribe
+    /** Miniatura: troca entre os tamanhos pequeno, médio e grande. */
+    cycleMiniSize(): void
+    /** Miniatura: arrastar pela própria janela (sem barra de título). */
+    drag(phase: 'start' | 'move' | 'end'): void
   }
   people: {
     /** Pill: abre/fecha a lista de pessoas da chamada. */
@@ -130,7 +153,10 @@ export interface PlatformBridge {
     getState(): Promise<HostState>
     /** Abre o servidor e espera ele responder (ou falhar). */
     start(options?: HostStartOptions): Promise<HostState>
-    stop(): void
+    /** `end` = encerra para todos; `handoff` = passa a sessão para o próximo da fila. */
+    stop(mode?: HostStopMode): void
+    /** Gera um link de convite novo (os antigos param de funcionar). */
+    rotateInvite(): Promise<HostState>
     /** Troca a senha do canal aberto por este app (null = sem senha). */
     setPassword(password: string | null): Promise<boolean>
     onChange(listener: (state: HostState) => void): Unsubscribe
@@ -163,6 +189,14 @@ export interface PlatformBridge {
     mirror(request: SessionMirrorRequest | null): void
     /** Pill: junta à cópia as mensagens que chegaram depois da última cópia. */
     saveMessages(messages: ChatMessage[]): Promise<void>
+    /** Pill: o host avisou que vai sair: atualiza a cópia agora. */
+    mirrorNow(): Promise<void>
+  }
+  pointer: {
+    /** Pill: alguém apontou na sua transmissão: mostra o marcador sobre a tela compartilhada. */
+    show(ping: PointerPing): void
+    /** Overlay de marcadores: recebe os marcadores para desenhar. */
+    onPing(listener: (ping: PointerPing) => void): Unsubscribe
   }
   invite: {
     /** Painel: pega o convite que abriu o app (e o tira da fila). */

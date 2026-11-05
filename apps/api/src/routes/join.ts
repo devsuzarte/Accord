@@ -3,8 +3,18 @@ import { PASSWORD_HEADER } from '@sharescreen/shared'
 import { Elysia, t } from 'elysia'
 import { AccessToken } from 'livekit-server-sdk'
 import { env } from '../env'
-import { allowedSources, CHANNEL_NAME, ROOM } from '../services/livekit'
-import { blocksOf, isLoopback, rememberName, roleOf, setRole } from '../services/roles'
+import { callerOf } from '../services/auth'
+import { allowedSources, CHANNEL_NAME, ROOM, roomService } from '../services/livekit'
+import { blocksOf, rememberName, roleOf, setRole } from '../services/roles'
+import {
+  ipOfIdentity,
+  isHostRequest,
+  normalizeIp,
+  overLimit,
+  passwordFailed,
+  passwordLocked,
+  rememberIp,
+} from '../services/security'
 import { checkPassword } from '../services/session'
 
 /**
@@ -21,11 +31,38 @@ function livekitUrlFor(request: Request): string {
 }
 
 /**
+ * Já tem alguém com esse nome na call, vindo de outro PC? (Impede se passar por outra pessoa.)
+ * Do mesmo PC é a mesma pessoa voltando (a conexão antiga pode ainda não ter saído).
+ */
+export async function nameTaken(name: string, ip: string, except?: string): Promise<boolean> {
+  const wanted = name.trim().toLowerCase()
+  try {
+    const participants = await roomService().listParticipants(ROOM)
+    return participants.some(
+      (p) =>
+        !p.permission?.hidden &&
+        p.identity !== except &&
+        (p.name || '').trim().toLowerCase() === wanted &&
+        ipOfIdentity(p.identity) !== ip,
+    )
+  } catch {
+    return false
+  }
+}
+
+const err = (set: { status?: number | string }, status: number, error: SessionError) => {
+  set.status = status
+  return { error }
+}
+
+/**
  * Entrada aberta: qualquer pessoa que alcance o servidor entra no canal "Geral" só com
- * um nome. É o modelo de "sala de amigos" enquanto contas não existem (M3); OPEN_JOIN=false
- * desliga. `viewer: true` gera o token invisível e só-assistir da janela de transmissão.
+ * um nome (e a senha, se o canal tiver). OPEN_JOIN=false desliga.
  *
- * Quem entra pelo próprio computador do servidor vira "dono" (owner).
+ * `viewer: true` gera o token invisível e só-assistir da janela de transmissão. Só sai para
+ * quem já está na call (manda o próprio token): ninguém assiste escondido.
+ *
+ * Dono: quem entra pelo app de quem hospeda (mesmo PC + chave do app).
  */
 export const joinRoutes = new Elysia().post(
   '/join',
@@ -36,19 +73,32 @@ export const joinRoutes = new Elysia().post(
     server,
     set,
   }): Promise<JoinResponse | { error: SessionError }> => {
-    const passwordError = checkPassword(headers[PASSWORD_HEADER])
-    if (passwordError) {
-      set.status = 401
-      return { error: passwordError }
-    }
-    const name = body.name.trim()
+    const ip = normalizeIp(server?.requestIP(request)?.address ?? 'desconhecido')
+    if (overLimit(`join:${ip}`, 20, 60_000)) return err(set, 429, 'too-many-attempts')
     const viewer = body.viewer === true
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'pessoa'
-    const identity = `${viewer ? 'viewer-' : ''}${slug}-${crypto.randomUUID().slice(0, 8)}`
 
-    const address = server?.requestIP(request)?.address
-    if (!viewer) rememberName(identity, name)
-    if (!viewer && isLoopback(address)) setRole(identity, 'owner')
+    let identity: string
+    let name = body.name.trim()
+    if (viewer) {
+      const who = await callerOf(headers)
+      if ('error' in who) return err(set, who.status, who.error)
+      name = who.name
+      identity = `viewer-${who.identity}-${crypto.randomUUID().slice(0, 6)}`
+    } else {
+      if (passwordLocked(ip)) return err(set, 429, 'too-many-attempts')
+      const passwordError = checkPassword(headers[PASSWORD_HEADER])
+      if (passwordError) {
+        if (passwordError === 'wrong-password') passwordFailed(ip)
+        return err(set, 401, passwordError)
+      }
+      if (!name) return err(set, 400, 'bad-message')
+      if (await nameTaken(name, ip)) return err(set, 409, 'name-taken')
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'pessoa'
+      identity = `${slug}-${crypto.randomUUID().slice(0, 8)}`
+      rememberName(identity, name)
+      rememberIp(identity, ip)
+      if (isHostRequest(ip, headers)) setRole(identity, 'owner')
+    }
     const role = roleOf(identity)
 
     const avatar =
@@ -61,6 +111,7 @@ export const joinRoutes = new Elysia().post(
       name,
       ttl: '6h',
       // Só para a interface mostrar; a autorização usa o mapa de papéis do servidor.
+      // Os atributos só mudam pelo servidor (POST /me), então ninguém se coloca de "dono".
       attributes: viewer
         ? {}
         : {
@@ -86,8 +137,8 @@ export const joinRoutes = new Elysia().post(
             roomJoin: true,
             canPublish: true,
             canSubscribe: true,
-            // Nome, foto e "ensurdecido" são atualizados pelo próprio cliente.
-            canUpdateOwnMetadata: true,
+            canPublishData: false,
+            canUpdateOwnMetadata: false,
             canPublishSources: allowedSources(blocksOf(identity)),
           },
     )
@@ -102,7 +153,7 @@ export const joinRoutes = new Elysia().post(
   },
   {
     body: t.Object({
-      name: t.String({ minLength: 1, maxLength: 32 }),
+      name: t.String({ maxLength: 32 }),
       viewer: t.Optional(t.Boolean()),
       avatar: t.Optional(t.String({ maxLength: 64 })),
     }),

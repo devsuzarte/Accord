@@ -6,9 +6,10 @@ import { createRoot } from 'react-dom/client'
 import { startLanguage } from '../shared/i18n'
 import { startTheme } from '../shared/theme'
 import { Pill } from './Pill'
-import { startReportingCallState } from './call/callStore'
+import { startReportingCallState, startVoiceMode } from './call/callStore'
 
 startReportingCallState()
+startVoiceMode()
 
 startTheme()
 

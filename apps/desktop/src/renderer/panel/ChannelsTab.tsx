@@ -33,6 +33,7 @@ import {
   RefreshCw,
   Server,
   Square,
+  Users,
   Volume2,
   X,
 } from 'lucide-react'
@@ -479,11 +480,11 @@ function ServerCard({
               ))}
             </span>
             <span className="server__count">
-              {channel.people.length === 0
+              {(channel.count ?? channel.people.length) === 0
                 ? t('channels.nobody')
-                : channel.people.length === 1
+                : (channel.count ?? channel.people.length) === 1
                   ? t('channels.people.one')
-                  : t('channels.people.other', { n: channel.people.length })}
+                  : t('channels.people.other', { n: channel.count ?? channel.people.length })}
             </span>
             <button
               type="button"
@@ -663,13 +664,23 @@ function HostSection({ call, profile, onEditProfile }: ChannelsTabProps) {
               <span className="address__route">{t(routeKey(a.route))}</span>
               <code className="address__ip">{a.address}</code>
               <CopyAddress address={a.address} />
-              <CopyInvite
-                address={a.address}
-                link={inviteFor(a.address, '', host.locked ? password.trim() || null : null)}
-              />
+              <CopyInvite address={a.address} link={inviteFor(a.address, '', host.invite)} />
             </li>
           ))}
         </ul>
+        {host.status === 'running' && host.locked && (
+          <div className="rotate">
+            <button
+              type="button"
+              className="action action--small"
+              onClick={() => void window.platform.host.rotateInvite()}
+            >
+              <RefreshCw size={14} />
+              {t('host.rotateInvite')}
+            </button>
+            <p className="field__hint">{t('host.rotateInviteHint')}</p>
+          </div>
+        )}
       </div>
 
       {!profile.name && <NeedName onEditProfile={onEditProfile} />}
@@ -704,17 +715,61 @@ function HostSection({ call, profile, onEditProfile }: ChannelsTabProps) {
           {saved === 'fail' && <p className="notice notice--error">{t('host.passwordFailed')}</p>}
         </form>
       )}
-      {host.status === 'running' && (
-        <button
-          type="button"
-          className="action action--danger"
-          onClick={() => window.platform.host.stop()}
-        >
-          <Square size={14} />
-          {t('host.stop')}
+      {host.status === 'running' && <StopHosting call={call} />}
+    </>
+  )
+}
+
+/**
+ * Parar de hospedar com gente na call: perguntar se encerra para todos ou passa a sessão
+ * para o próximo da fila (antes, os outros ficavam reconectando até cair).
+ */
+function StopHosting({ call }: { call: CallSnapshot }) {
+  const t = useT()
+  const [asking, setAsking] = useState(false)
+  const [stopping, setStopping] = useState(false)
+  const others = call.status !== 'idle' ? call.participants.filter((p) => !p.isLocal).length : 0
+  const stop = (mode: 'end' | 'handoff') => {
+    setStopping(true)
+    window.platform.host.stop(mode)
+  }
+  if (stopping) {
+    return (
+      <p className="row__text">
+        <Loader size={14} className="spin" /> {t('host.stopping')}
+      </p>
+    )
+  }
+  if (!asking) {
+    return (
+      <button
+        type="button"
+        className="action action--danger"
+        onClick={() => (others > 0 ? setAsking(true) : stop('end'))}
+      >
+        <Square size={14} />
+        {t('host.stop')}
+      </button>
+    )
+  }
+  return (
+    <div className="confirm" role="group" aria-label={t('host.stopAsk')}>
+      <p className="confirm__title">{t('host.stopAsk')}</p>
+      <p className="row__text">{t('host.stopAskText', { n: others })}</p>
+      <button type="button" className="action action--danger" onClick={() => stop('end')}>
+        <Square size={14} />
+        {t('host.stopEnd')}
+      </button>
+      {call.successor && (
+        <button type="button" className="action" onClick={() => stop('handoff')}>
+          <Users size={14} />
+          {t('host.stopHandoff', { name: call.successor })}
         </button>
       )}
-    </>
+      <button type="button" className="action action--quiet" onClick={() => setAsking(false)}>
+        {t('host.stopCancel')}
+      </button>
+    </div>
   )
 }
 

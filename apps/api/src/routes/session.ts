@@ -1,41 +1,37 @@
-import type { ChatEvent, SessionError } from '@sharescreen/shared'
+import type { ChatEvent, SessionError, SessionEvent } from '@sharescreen/shared'
 import {
   CHAT_MAX_ATTACHMENTS,
   CHAT_MAX_FILE_BYTES,
   CHAT_MAX_TEXT,
   CHAT_TOPIC,
-  PASSWORD_HEADER,
+  SESSION_TOPIC,
 } from '@sharescreen/shared'
 import { Elysia, t } from 'elysia'
 import { DataPacket_Kind } from 'livekit-server-sdk'
-import { ROOM, roomService, verifyToken } from '../services/livekit'
-import { isLoopback } from '../services/roles'
+import { callerOf } from '../services/auth'
+import { ROOM, roomService } from '../services/livekit'
+import { isHostRequest, overLimit } from '../services/security'
 import {
   addFile,
   addMessage,
-  checkPassword,
+  currentInvite,
+  hasPassword,
   history,
   readAttachment,
+  rotateInvite,
   setPassword,
   snapshot,
 } from '../services/session'
 
-type Headers = Record<string, string | undefined>
+const caller = (headers: Record<string, string | undefined>) => callerOf(headers)
 
-/** Quem pede: token da chamada (Bearer) + senha do canal, se houver. */
-async function caller(
-  headers: Headers,
-): Promise<{ identity: string; name: string } | { error: SessionError; status: number }> {
-  const passwordError = checkPassword(headers[PASSWORD_HEADER])
-  if (passwordError) return { error: passwordError, status: 401 }
-  try {
-    const token = headers.authorization?.replace(/^Bearer\s+/i, '') ?? ''
-    const who = await verifyToken(token)
-    if (who.viewer) return { error: 'invalid-session', status: 401 }
-    return { identity: who.identity, name: who.name }
-  } catch {
-    return { error: 'invalid-session', status: 401 }
-  }
+/** Avisa todos na sala (fim da sessão, troca de host, convite novo). */
+export async function announce(event: SessionEvent): Promise<void> {
+  await roomService()
+    .sendData(ROOM, new TextEncoder().encode(JSON.stringify(event)), DataPacket_Kind.RELIABLE, {
+      topic: SESSION_TOPIC,
+    })
+    .catch((error) => console.error('[sessão] não consegui avisar a sala', error))
 }
 
 async function avatarOf(identity: string): Promise<string | null> {
@@ -76,6 +72,10 @@ export const sessionRoutes = new Elysia()
         set.status = who.status
         return { error: who.error }
       }
+      if (overLimit(`chat:${who.identity}`, 8, 10_000)) {
+        set.status = 429
+        return { error: 'slow-down' }
+      }
       const result = addMessage(
         { identity: who.identity, name: who.name, avatar: await avatarOf(who.identity) },
         body.text,
@@ -105,6 +105,10 @@ export const sessionRoutes = new Elysia()
         set.status = who.status
         return { error: who.error }
       }
+      if (overLimit(`file:${who.identity}`, 12, 60_000)) {
+        set.status = 429
+        return { error: 'slow-down' }
+      }
       const length = Number(headers['content-length'] ?? 0)
       if (length > CHAT_MAX_FILE_BYTES) {
         set.status = 413
@@ -119,7 +123,7 @@ export const sessionRoutes = new Elysia()
       }
       const result = addFile(name, headers['content-type'] ?? '', bytes)
       if (typeof result === 'string') {
-        set.status = result === 'too-large' ? 413 : 507
+        set.status = result === 'too-large' ? 413 : result === 'blocked-file' ? 415 : 507
         return { error: result }
       }
       return result
@@ -151,16 +155,60 @@ export const sessionRoutes = new Elysia()
     }
     return snapshot()
   })
-  // Só o próprio PC do servidor troca a senha (o app de quem hospeda).
+  // Chave do link de convite (quem está na call pode convidar, sem precisar saber a senha).
+  .get('/session/invite', async ({ headers, request, server, set }) => {
+    const host = isHostRequest(server?.requestIP(request)?.address, headers)
+    const who = host ? null : await caller(headers)
+    if (who && 'error' in who) {
+      set.status = who.status
+      return { error: who.error }
+    }
+    return { locked: hasPassword(), invite: currentInvite() }
+  })
+  // Daqui para baixo, só o app de quem hospeda (mesmo PC + chave do app).
   .post(
     '/session/password',
-    ({ body, request, server, set }) => {
-      if (!isLoopback(server?.requestIP(request)?.address)) {
+    async ({ body, headers, request, server, set }) => {
+      if (!isHostRequest(server?.requestIP(request)?.address, headers)) {
         set.status = 403
-        return { error: 'invalid-session' satisfies SessionError }
+        return { error: 'forbidden' satisfies SessionError }
       }
       setPassword(body.password)
-      return { ok: true }
+      await announce({ type: 'invite-rotated' })
+      return { ok: true, invite: currentInvite() }
     },
     { body: t.Object({ password: t.Union([t.String({ maxLength: 64 }), t.Null()]) }) },
+  )
+  .post('/session/invite/rotate', async ({ headers, request, server, set }) => {
+    if (!isHostRequest(server?.requestIP(request)?.address, headers)) {
+      set.status = 403
+      return { error: 'forbidden' satisfies SessionError }
+    }
+    const invite = rotateInvite()
+    await announce({ type: 'invite-rotated' })
+    return { invite }
+  })
+  /**
+   * Parar de hospedar. `end`: todos saem na hora (a sala é apagada). `handoff`: avisa que o host
+   * vai sair, para o primeiro da fila assumir sem esperar a conexão cair; o app de quem hospeda
+   * fecha o servidor logo depois.
+   */
+  .post(
+    '/session/end',
+    async ({ body, headers, request, server, set }) => {
+      if (!isHostRequest(server?.requestIP(request)?.address, headers)) {
+        set.status = 403
+        return { error: 'forbidden' satisfies SessionError }
+      }
+      if (body.mode === 'handoff') {
+        await announce({ type: 'handoff' })
+        return { ok: true }
+      }
+      await announce({ type: 'ended' })
+      await roomService()
+        .deleteRoom(ROOM)
+        .catch(() => undefined)
+      return { ok: true }
+    },
+    { body: t.Object({ mode: t.Union([t.Literal('end'), t.Literal('handoff')]) }) },
   )

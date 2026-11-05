@@ -1,6 +1,10 @@
 import type {
   AudioState,
+  CallServer,
   CallSnapshot,
+  PointerPing,
+  SessionEvent,
+  VoiceHotkeys,
   JoinResponse,
   ModerationAction,
   ParticipantState,
@@ -8,8 +12,13 @@ import type {
   Role,
   ShareRequest,
 } from '@sharescreen/shared'
-import { normalizeServerUrl, PASSWORD_HEADER } from '@sharescreen/shared'
-import { DisconnectReason, Room, RoomEvent, Track } from 'livekit-client'
+import {
+  normalizeServerUrl,
+  PASSWORD_HEADER,
+  POINTER_TOPIC,
+  SESSION_TOPIC,
+} from '@sharescreen/shared'
+import { ConnectionState, DisconnectReason, Room, RoomEvent, Track } from 'livekit-client'
 import type {
   LocalAudioTrack,
   LocalTrackPublication,
@@ -89,6 +98,27 @@ let succession: Successor[] = []
 let amHost = false
 let migrating = false
 let lastMirror = ''
+/** O host avisou que vai sair e passar a sessão (quem vem a seguir assume sem esperar). */
+let handoffPending = false
+/** Id da sessão (de /info): na migração, só seguimos um servidor da MESMA sessão. */
+let sessionId = ''
+let reconnectCheck: ReturnType<typeof setTimeout> | null = null
+/** Aperte para falar: o microfone só manda som enquanto o atalho está apertado. */
+let voiceMode: 'voice' | 'ptt' = 'voice'
+let pttHeld = false
+let pttReleaseMs = 200
+let pttTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Liga/desliga o som do microfone sem "mutar" de verdade (os outros não veem o ícone piscar e
+ * não há atraso para reabrir o microfone): no modo aperte-para-falar, fora do atalho vai silêncio.
+ */
+function applyPushToTalk(): void {
+  const publication = room?.localParticipant.getTrackPublication(Track.Source.Microphone)
+  const track = publication?.audioTrack?.mediaStreamTrack
+  if (!track || publication?.isMuted) return
+  track.enabled = voiceMode !== 'ptt' || pttHeld
+}
 
 const withPassword = (headers: Record<string, string>, pw: string | null) =>
   pw ? { ...headers, [PASSWORD_HEADER]: pw } : headers
@@ -272,6 +302,53 @@ function participantsOf(r: Room, deafened: boolean): ParticipantState[] {
   ]
 }
 
+/**
+ * Nome, foto, "ensurdecido" e endereços passam pelo servidor (o token não deixa o app mudar os
+ * próprios atributos: assim ninguém se coloca de "dono" nem anuncia endereço falso).
+ */
+async function updateMe(fields: {
+  name?: string
+  avatar?: string
+  deafened?: boolean
+  addrs?: string[]
+}): Promise<string | null> {
+  if (!serverUrl || !token) return null
+  try {
+    const response = await fetch(`${serverUrl}/me`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify(fields),
+    })
+    if (response.ok) return null
+    const body = (await response.json().catch(() => null)) as { error?: string } | null
+    return body?.error ?? String(response.status)
+  } catch (error) {
+    return String(error)
+  }
+}
+
+/** Dados do convite da chamada atual (a chave, nunca a senha). */
+async function fetchServer(base: string, accessToken: string): Promise<CallServer> {
+  const [info, invite] = await Promise.all([
+    fetch(`${base}/info`, { signal: AbortSignal.timeout(3000) })
+      .then((r) => r.json() as Promise<{ name?: string; session?: string }>)
+      .catch(() => null),
+    fetch(`${base}/session/invite`, {
+      headers: { authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(3000),
+    })
+      .then((r) => r.json() as Promise<{ locked?: boolean; invite?: string | null }>)
+      .catch(() => null),
+  ])
+  if (info?.session) sessionId = info.session
+  return {
+    url: base,
+    name: info?.name ?? '',
+    locked: invite?.locked === true,
+    invite: invite?.invite ?? null,
+  }
+}
+
 async function requestToken(name: string, base: string, avatar: string): Promise<JoinResponse> {
   let response: Response
   try {
@@ -286,7 +363,14 @@ async function requestToken(name: string, base: string, avatar: string): Promise
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: string } | null
     if (body?.error === 'password-required') throw new Error(t('call.err.passwordRequired'))
-    if (body?.error === 'wrong-password') throw new Error(t('call.err.wrongPassword'))
+    if (body?.error === 'wrong-password') {
+      throw new Error(
+        password?.startsWith('invite:') ? t('call.err.inviteExpired') : t('call.err.wrongPassword'),
+      )
+    }
+    if (body?.error === 'too-many-attempts') throw new Error(t('call.err.tooManyAttempts'))
+    if (body?.error === 'name-taken') throw new Error(t('call.err.nameTaken', { name }))
+    if (body?.error === 'banned') throw new Error(t('call.err.banned'))
     throw new Error(t('call.err.joinRefused', { status: response.status }))
   }
   return (await response.json()) as JoinResponse
@@ -295,6 +379,7 @@ async function requestToken(name: string, base: string, avatar: string): Promise
 export const useCallStore = create<CallStore>((set, get) => {
   const refresh = () => {
     if (!room) return
+    applyPushToTalk()
     applyVoiceVolumes(get().audio.deafened)
     set({ participants: participantsOf(room, get().audio.deafened) })
     updateSuccession(room)
@@ -307,6 +392,8 @@ export const useCallStore = create<CallStore>((set, get) => {
   const updateSuccession = (r: Room) => {
     succession = successionOf(r)
     amHost = r.localParticipant.attributes.role === 'owner'
+    const successor = succession.find((p) => p.identity !== r.localParticipant.identity)
+    if ((successor?.name ?? null) !== get().successor) set({ successor: successor?.name ?? null })
     const position = succession.findIndex((s) => s.identity === r.localParticipant.identity)
     const request =
       amHost || position < 0 || !token ? null : { serverUrl, token, password, files: position < 2 }
@@ -339,14 +426,46 @@ export const useCallStore = create<CallStore>((set, get) => {
   const reset = (error: string | null) => {
     dropRoom()
     migrating = false
+    handoffPending = false
+    if (reconnectCheck) clearTimeout(reconnectCheck)
+    reconnectCheck = null
     endChat()
     lastMirror = ''
     window.platform.session.mirror(null)
     if (error) log(`saiu do canal: ${error}`)
-    set({ status: 'idle', sharing: null, channelName: null, participants: [], error, server: null })
+    set({
+      status: 'idle',
+      sharing: null,
+      channelName: null,
+      participants: [],
+      error,
+      server: null,
+      successor: null,
+    })
   }
 
   const wire = (r: Room) => {
+    const onReconnecting = (media: boolean) => {
+      log(media ? 'reconectando' : 'reconectando ao servidor')
+      if (media) set({ status: 'reconnecting' })
+      // O host avisou que ia sair: nem tenta reconectar, já vai para o próximo.
+      if (handoffPending) return void r.disconnect()
+      // O LiveKit tenta reconectar por quase um minuto. Se a API do host também sumiu, não
+      // adianta esperar: larga a sala e parte para a migração (ou para o aviso de que caiu).
+      if (reconnectCheck) return
+      const base = serverUrl
+      reconnectCheck = setTimeout(() => {
+        reconnectCheck = null
+        if (room !== r || r.state === ConnectionState.Connected) return
+        void serverAlive(base).then((alive) => {
+          if (!alive && room === r && r.state !== ConnectionState.Connected) {
+            log('o host não responde: desistindo de reconectar')
+            void r.disconnect()
+          }
+        })
+      }, 4000)
+    }
+
     r.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
       subscribeVoices(participant)
       sound('user-join')
@@ -357,6 +476,7 @@ export const useCallStore = create<CallStore>((set, get) => {
         refresh()
       })
       .on(RoomEvent.ActiveSpeakersChanged, refresh)
+      .on(RoomEvent.LocalTrackPublished, refresh)
       .on(RoomEvent.TrackMuted, refresh)
       .on(RoomEvent.TrackUnmuted, refresh)
       .on(
@@ -422,11 +542,13 @@ export const useCallStore = create<CallStore>((set, get) => {
         track.detach().forEach((el) => el.remove())
         refresh()
       })
-      .on(RoomEvent.Reconnecting, () => {
-        log('reconectando')
-        set({ status: 'reconnecting' })
-      })
+      // SignalReconnecting: a conexão com o servidor caiu (antes de a mídia cair, o que só vem
+      // como Reconnecting uns 15 s depois). Os dois começam o mesmo tratamento.
+      .on(RoomEvent.SignalReconnecting, () => onReconnecting(false))
+      .on(RoomEvent.Reconnecting, () => onReconnecting(true))
       .on(RoomEvent.Reconnected, () => {
+        if (reconnectCheck) clearTimeout(reconnectCheck)
+        reconnectCheck = null
         log('reconectado')
         void refreshHistory()
         set({ status: 'connected', error: null })
@@ -434,11 +556,21 @@ export const useCallStore = create<CallStore>((set, get) => {
       })
       .on(
         RoomEvent.DataReceived,
-        (payload: Uint8Array, participant?: RemoteParticipant, _kind?: unknown, topic?: string) =>
-          handleChatData(payload, !!participant, topic),
+        (payload: Uint8Array, participant?: RemoteParticipant, _kind?: unknown, topic?: string) => {
+          // Só vale o que veio do servidor (sem participante): ninguém forja aviso de sessão.
+          if (participant) return
+          if (topic === SESSION_TOPIC) return handleSessionEvent(payload)
+          if (topic === POINTER_TOPIC) return handlePointer(payload)
+          handleChatData(payload, false, topic)
+        },
       )
       .on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
         if (leavingOnPurpose || room !== r) return reset(null)
+        if (reason === DisconnectReason.ROOM_DELETED && !handoffPending) {
+          // O host clicou em "Encerrar para todos".
+          sound('leave')
+          return reset(t('call.err.hostEnded'))
+        }
         if (
           reason === DisconnectReason.DUPLICATE_IDENTITY ||
           reason === DisconnectReason.PARTICIPANT_REMOVED
@@ -452,6 +584,41 @@ export const useCallStore = create<CallStore>((set, get) => {
         }
         void migrate()
       })
+  }
+
+  const handleSessionEvent = (payload: Uint8Array) => {
+    let event: SessionEvent
+    try {
+      event = JSON.parse(new TextDecoder().decode(payload)) as SessionEvent
+    } catch {
+      return
+    }
+    if (event.type === 'handoff') {
+      log('o host vai sair e passar a sessão')
+      handoffPending = true
+      // Quem vai assumir puxa a cópia mais nova antes de o servidor fechar.
+      void window.platform.session.saveMessages(chatMessages())
+      void window.platform.session.mirrorNow()
+      set({ error: t('call.migrating.handoff') })
+    }
+    if (event.type === 'invite-rotated' && room) {
+      const base = serverUrl
+      void fetchServer(base, token).then((server) => {
+        if (serverUrl === base) set({ server })
+      })
+    }
+  }
+
+  const handlePointer = (payload: Uint8Array) => {
+    let ping: PointerPing
+    try {
+      ping = JSON.parse(new TextDecoder().decode(payload)) as PointerPing
+    } catch {
+      return
+    }
+    if (ping.type !== 'ping' || !room || ping.target !== room.localParticipant.identity) return
+    if (!get().sharing || !pointerAllowed()) return
+    window.platform.pointer.show(ping)
   }
 
   // Mensagem nova de outra pessoa: um "tic" baixinho (só o histórico ao entrar não toca).
@@ -504,29 +671,21 @@ export const useCallStore = create<CallStore>((set, get) => {
     if (audio.outputDeviceId) {
       await r.switchActiveDevice('audiooutput', audio.outputDeviceId).catch(() => undefined)
     }
-    const info = await fetch(`${base}/info`, { signal: AbortSignal.timeout(3000) })
-      .then((r) => r.json() as Promise<{ name?: string }>)
-      .catch(() => null)
-    set({
-      status: 'connected',
-      channelName: access.channelName,
-      error: null,
-      server: { url: base, name: info?.name ?? '', password },
-    })
+    const server = await fetchServer(base, access.token)
+    set({ status: 'connected', channelName: access.channelName, error: null, server })
     sound('join')
     log(`conectado em ${access.livekitUrl} como ${access.role}`)
 
     // Endereços deste PC: se o host cair e for a minha vez, os outros me acham por eles.
     const host = await window.platform.host.getState().catch(() => null)
-    const addrs = host?.addresses.map((a) => a.address).join(',') ?? ''
-    await r.localParticipant.setAttributes({ addrs }).catch(() => undefined)
+    await updateMe({ addrs: host?.addresses.map((a) => a.address) ?? [] })
     await startChat(base, access.token, password, access.identity, access.channelName)
     refresh()
 
     // Entra respeitando o que a pessoa escolheu antes: mudo e/ou ensurdecido.
     if (audio.deafened) {
       micBeforeDeafen = !audio.micMuted
-      await r.localParticipant.setAttributes({ deafened: '1' }).catch(() => undefined)
+      await updateMe({ deafened: true })
     }
     try {
       if (!audio.micMuted && !audio.deafened) {
@@ -544,7 +703,12 @@ export const useCallStore = create<CallStore>((set, get) => {
    * servidor com a cópia da sessão; senão, espero o servidor dele aparecer e entro lá.
    */
   const migrate = async () => {
+    const handoff = handoffPending
+    handoffPending = false
+    if (reconnectCheck) clearTimeout(reconnectCheck)
+    reconnectCheck = null
     const previous = {
+      session: sessionId,
       base: serverUrl,
       name: myName,
       password,
@@ -564,7 +728,8 @@ export const useCallStore = create<CallStore>((set, get) => {
     log('a conexão caiu; conferindo se o host ainda está lá')
     const cancelled = () => !migrating
     try {
-      if (previous.wasHost || (await serverAlive(previous.base))) {
+      // Passagem combinada: nem confere o host antigo (ele está fechando de propósito).
+      if (!handoff && (previous.wasHost || (await serverAlive(previous.base)))) {
         await connect(previous.name, previous.base, previous.password)
         return
       }
@@ -591,6 +756,7 @@ export const useCallStore = create<CallStore>((set, get) => {
             previous.base,
             index === 0 ? 30_000 : 25_000,
             cancelled,
+            previous.session,
           )
           if (!url || cancelled()) continue
           log(`seguindo o host novo em ${url}`)
@@ -618,6 +784,8 @@ export const useCallStore = create<CallStore>((set, get) => {
     participants: [],
     error: null,
     server: null,
+    successor: null,
+    pushToTalk: null,
 
     async join(name, joinUrl, joinPassword) {
       if (get().status !== 'idle') return
@@ -684,9 +852,7 @@ export const useCallStore = create<CallStore>((set, get) => {
           .setMicrophoneEnabled(!micMuted && !blocked)
           .catch(() => undefined)
         // Os outros veem o selo "ensurdecido" pelo atributo do participante.
-        await room.localParticipant
-          .setAttributes({ deafened: deafened ? '1' : '0' })
-          .catch(() => undefined)
+        await updateMe({ deafened })
       }
       refresh()
     },
@@ -773,7 +939,7 @@ export const useCallStore = create<CallStore>((set, get) => {
         identity: participant.userId,
         name: participant.displayName,
         serverUrl,
-        password,
+        token,
       })
     },
 
@@ -831,15 +997,15 @@ export const useCallStore = create<CallStore>((set, get) => {
       const r = room
       const name = profile.name.trim()
       if (name && name !== r.localParticipant.name) {
-        await r.localParticipant
-          .setName(name)
-          .catch((error) => log(`falha ao trocar nome: ${error}`))
+        const error = await updateMe({ name })
+        if (error === 'name-taken') set({ error: t('call.err.nameTaken', { name }) })
+        else if (error) log(`falha ao trocar nome: ${error}`)
+        else myName = name
       }
       const avatar = await uploadAvatar(profile.avatar, serverUrl)
       if ((r.localParticipant.attributes.avatar ?? '') !== avatar) {
-        await r.localParticipant
-          .setAttributes({ avatar })
-          .catch((error) => log(`falha ao trocar foto: ${error}`))
+        const error = await updateMe({ avatar })
+        if (error) log(`falha ao trocar foto: ${error}`)
       }
       refresh()
     },
@@ -847,6 +1013,49 @@ export const useCallStore = create<CallStore>((set, get) => {
 })
 
 /** Publica o retrato da chamada para o main (que repassa ao painel). */
+
+const POINTER_KEY = 'sharescreen.pointer.allow'
+
+/** Deixar quem assiste apontar na minha tela (Overlay › Marcadores). Ligado por padrão. */
+export function pointerAllowed(): boolean {
+  try {
+    return localStorage.getItem(POINTER_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+/** Atalho de aperte-para-falar (vem do main, que lê o teclado e o mouse). */
+function pushToTalk(down: boolean): void {
+  if (voiceMode !== 'ptt') return
+  if (pttTimer) clearTimeout(pttTimer)
+  pttTimer = null
+  const apply = (held: boolean) => {
+    pttHeld = held
+    applyPushToTalk()
+    useCallStore.setState({ pushToTalk: { held } })
+  }
+  // Solta com um pequeno atraso para não cortar o fim da frase.
+  if (down) apply(true)
+  else pttTimer = setTimeout(() => apply(false), pttReleaseMs)
+}
+
+/** Modo de voz escolhido no painel (Overlay › Atalhos). */
+export function startVoiceMode(): () => void {
+  const apply = (hotkeys: VoiceHotkeys) => {
+    voiceMode = hotkeys.voiceMode
+    pttReleaseMs = hotkeys.pttReleaseMs
+    pttHeld = false
+    applyPushToTalk()
+    useCallStore.setState({ pushToTalk: voiceMode === 'ptt' ? { held: false } : null })
+  }
+  window.platform.hotkeys
+    .voice()
+    .then(apply)
+    .catch(() => undefined)
+  return window.platform.hotkeys.onVoiceChange(apply)
+}
+
 export function startReportingCallState(): () => void {
   const toSnapshot = (s: CallStore): CallSnapshot => ({
     status: s.status,
@@ -856,6 +1065,8 @@ export function startReportingCallState(): () => void {
     participants: s.participants,
     error: s.error,
     server: s.server,
+    successor: s.successor,
+    pushToTalk: s.pushToTalk,
   })
   window.platform.call.report(toSnapshot(useCallStore.getState()))
   const unsubscribeStore = useCallStore.subscribe((s) => window.platform.call.report(toSnapshot(s)))
@@ -872,6 +1083,8 @@ export function startReportingCallState(): () => void {
         return void store.toggleMic()
       case 'toggle-deafen':
         return void store.toggleDeafen()
+      case 'ptt':
+        return pushToTalk(command.down)
       case 'set-input':
         return void store.setInputDevice(command.deviceId)
       case 'set-output':

@@ -76,6 +76,10 @@ async function probeUrl(candidate: Candidate): Promise<DiscoveredServer | null> 
           avatar:
             typeof p.avatar === 'string' && p.avatar.startsWith('/avatars/') ? p.avatar : null,
         })),
+        count:
+          typeof c.count === 'number' && Number.isInteger(c.count) && c.count >= 0
+            ? Math.min(c.count, 999)
+            : undefined,
       })),
       url: candidate.url,
       route: candidate.route,

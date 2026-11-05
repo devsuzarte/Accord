@@ -134,6 +134,7 @@ export function Pill() {
   const t = useT()
   const overlay = useOverlayState()
   const call = useCall()
+  const pushToTalk = useCallStore((s) => s.pushToTalk)
   const [mode, setModeState] = useState<Mode>(readMode)
   const [dismissedError, setDismissedError] = useState<string | null>(null)
 
@@ -236,6 +237,15 @@ export function Pill() {
                       <HeadphoneOff size={15} aria-label={t('pill.deafened')} />
                     ) : (
                       me.micMuted && <MicOff size={15} aria-label={t('pill.micOff')} />
+                    )}
+                    {pushToTalk && !me.micMuted && !me.deafened && (
+                      <span
+                        className="ptt"
+                        data-held={pushToTalk.held || undefined}
+                        title={t('pill.pttHint')}
+                      >
+                        {t('pill.ptt')}
+                      </span>
                     )}
                   </span>
                 </button>

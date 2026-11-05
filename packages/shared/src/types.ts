@@ -91,12 +91,26 @@ export interface CallSnapshot {
   /** Mensagem pronta para mostrar quando entrar falhou ou a conexão caiu. */
   error: string | null
   /** Servidor da chamada atual (para gerar convites). */
-  server: { url: string; name: string; password: string | null } | null
+  server: CallServer | null
+  /** Quem assume se o host sair (para o "passar o host"). */
+  successor: string | null
+  /** Modo aperte-para-falar ligado (`held` = segurando o atalho agora). */
+  pushToTalk: { held: boolean } | null
+}
+
+export interface CallServer {
+  url: string
+  name: string
+  /** O canal pede senha. */
+  locked: boolean
+  /** Chave de convite atual (só em canal com senha); o link leva a chave, nunca a senha. */
+  invite: string | null
 }
 
 /** Comandos que o painel manda para o pill (via main). */
 export type CallCommand =
   | { type: 'join'; name: string; serverUrl: string; password?: string | null }
+  | { type: 'ptt'; down: boolean }
   | { type: 'leave' }
   | { type: 'toggle-mic' }
   | { type: 'toggle-deafen' }
@@ -154,8 +168,18 @@ export interface ViewerTarget {
   identity: string
   name: string
   serverUrl: string
-  /** Senha do canal, se houver (o viewer entra com conexão própria). */
-  password?: string | null
+  /** Token da chamada de quem assiste: o servidor só dá a conexão de assistir a quem está na call. */
+  token: string
+  /** Preenchido pelo main: esta janela é a miniatura sobre o jogo. */
+  mini?: boolean
+}
+
+/** Estado da miniatura (o main manda quando muda por fora, ex.: atalho de destravar). */
+export interface MiniViewerState {
+  /** Travada = o clique atravessa para o jogo. */
+  locked: boolean
+  /** 0.3 a 1. */
+  opacity: number
 }
 
 // ───────────────────────── Perfil e aparência ─────────────────────────
@@ -200,7 +224,10 @@ export interface ChannelPerson {
 export interface ChannelInfo {
   id: string
   name: string
+  /** Nomes e fotos (vazio em canal com senha: quem não entrou não fica sabendo quem está lá). */
   people: ChannelPerson[]
+  /** Quantas pessoas estão no canal. */
+  count?: number
 }
 
 /** Resposta de `GET /info`: quem é este servidor e o que tem nele. */
@@ -213,6 +240,8 @@ export interface ServerInfo {
   channels: ChannelInfo[]
   /** Pede senha para entrar. */
   locked: boolean
+  /** Identifica a sessão; continua igual quando o host muda (migração). */
+  session: string
 }
 
 /** Por onde o servidor foi achado (decide o rótulo e a ordem na lista). */
@@ -247,7 +276,12 @@ export interface HostState {
   error: 'port-in-use' | 'crashed' | 'timeout' | null
   /** O canal aberto por este app pede senha. */
   locked: boolean
+  /** Chave de convite do canal aberto aqui (só com senha). */
+  invite: string | null
 }
+
+/** Parar de hospedar: encerrar para todos ou passar a sessão para o próximo da fila. */
+export type HostStopMode = 'end' | 'handoff'
 
 export interface HostStartOptions {
   password?: string | null
@@ -283,6 +317,105 @@ export const CHAT_TOPIC = 'accord.chat'
 export const CHAT_MAX_TEXT = 2000
 export const CHAT_MAX_FILE_BYTES = 15 * 1024 * 1024
 export const CHAT_MAX_ATTACHMENTS = 4
+/** Avisos da sessão enviados pelo servidor (fim, troca de host, convite novo). */
+export const SESSION_TOPIC = 'accord.session'
+/** Marcadores na tela de quem transmite (o servidor confere quem mandou). */
+export const POINTER_TOPIC = 'accord.pointer'
+/** O app de quem hospeda se identifica para o próprio servidor (papel de dono, trocar senha). */
+export const HOST_KEY_HEADER = 'x-accord-host-key'
+/**
+ * No cabeçalho da senha, `invite:<chave>` entra com a chave do link de convite.
+ * Assim quem recebe o link entra sem nunca ver a senha.
+ */
+export const INVITE_PREFIX = 'invite:'
+
+export type SessionEvent = { type: 'ended' } | { type: 'handoff' } | { type: 'invite-rotated' }
+
+export interface PointerPing {
+  type: 'ping'
+  id: string
+  /** Quem transmite (a tela onde o marcador aparece). */
+  target: string
+  /** Posição no quadro da transmissão, de 0 a 1. */
+  x: number
+  y: number
+  from: string
+}
+
+/**
+ * Anexos que rodam programas ao abrir. O servidor recusa e o app nem envia: é o jeito mais
+ * comum de passar vírus por chat.
+ */
+export const BLOCKED_FILE_EXTENSIONS = [
+  'exe',
+  'msi',
+  'msix',
+  'appx',
+  'bat',
+  'cmd',
+  'com',
+  'scr',
+  'pif',
+  'cpl',
+  'msc',
+  'lnk',
+  'url',
+  'ps1',
+  'psm1',
+  'vbs',
+  'vbe',
+  'js',
+  'jse',
+  'wsf',
+  'wsh',
+  'hta',
+  'jar',
+  'reg',
+  'dll',
+  'sys',
+  'inf',
+  'iso',
+  'img',
+  'vhd',
+  'vhdx',
+  'application',
+  'gadget',
+  'chm',
+  'appref-ms',
+  'scf',
+]
+
+export function isBlockedFile(name: string): boolean {
+  const ext =
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[.\s]+$/, '')
+      .split('.')
+      .pop() ?? ''
+  return name.includes('.') && BLOCKED_FILE_EXTENSIONS.includes(ext)
+}
+
+/**
+ * Redes onde faz sentido um host estar: privadas, CGNAT/Tailscale (100.64/10), Radmin (26.x),
+ * Hamachi (25.x) e a faixa de teste 192.0.2.x. A migração só segue endereços assim.
+ */
+export function isPrivateIPv4(address: string): boolean {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(address.trim())
+  if (!m) return false
+  const [a, b, c] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  if ([a, b, c, Number(m[4])].some((n) => n > 255)) return false
+  return (
+    a === 10 ||
+    a === 26 ||
+    a === 25 ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 192 && b === 0 && c === 2) ||
+    a === 127
+  )
+}
 
 export type SessionError =
   | 'password-required'
@@ -292,6 +425,12 @@ export type SessionError =
   | 'session-full'
   | 'bad-message'
   | 'not-found'
+  | 'too-many-attempts'
+  | 'name-taken'
+  | 'blocked-file'
+  | 'banned'
+  | 'slow-down'
+  | 'forbidden'
 
 export interface ChatAttachment {
   id: string
@@ -324,9 +463,14 @@ export type ChatEvent = { type: 'message'; message: ChatMessage }
  * senha, chat (os anexos vão em arquivos ao lado) e quem o dono silenciou.
  */
 export interface SessionSnapshot {
-  version: 1
+  version: 2
   savedAt: number
-  password: string | null
+  /** A senha só vai como hash (scrypt): quem guarda a cópia não fica sabendo a senha. */
+  password: { salt: string; hash: string } | null
+  /** Chave dos links de convite (continua valendo depois da troca de host). */
+  invite: string | null
+  /** Mesmo valor de `ServerInfo.session`. */
+  session: string
   messages: ChatMessage[]
   files: ChatAttachment[]
   blocks: Record<string, { mic: boolean; audio: boolean }>

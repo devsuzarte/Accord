@@ -21,10 +21,10 @@ Esforço: P (dias), M (uma a duas semanas), G (mais que isso).
 
 | Ideia | Por que diferencia | Esforço |
 |---|---|---|
-| **Apontar na tela de quem transmite.** Quem assiste clica na transmissão e aparece um marcador (ou um rabisco que some em 3 s) no overlay de quem transmite, por cima do jogo | "Olha ali no minimapa" vira um clique. É o recurso que mais conversa com o uso real de compartilhar tela entre amigos | M |
-| **Transmissão em miniatura sobre o jogo.** O viewer vira uma janelinha do overlay (não focável, clique atravessa), para ver a tela do amigo enquanto você joga | Hoje, para assistir, você sai do seu jogo | M |
+| ✅ (0.4.0) **Apontar na tela de quem transmite.** Quem assiste clica na transmissão e aparece um marcador (ou um rabisco que some em 3 s) no overlay de quem transmite, por cima do jogo | "Olha ali no minimapa" vira um clique. É o recurso que mais conversa com o uso real de compartilhar tela entre amigos | M |
+| ✅ (0.4.0) **Transmissão em miniatura sobre o jogo.** O viewer vira uma janelinha do overlay (não focável, clique atravessa), para ver a tela do amigo enquanto você joga | Hoje, para assistir, você sai do seu jogo | M |
 | **Abaixar o som do jogo quando alguém fala.** O Windows deixa controlar o volume por aplicativo (`ISimpleAudioVolume`, pelo koffi que já usamos) | O Discord tem a "atenuação", que abaixa todos os outros apps juntos; aqui pode ser só o jogo, na medida que você escolher. Diferença pequena, mas é conforto diário | M |
-| **Atalhos globais para mutar e push-to-talk** (hoje só existem Ctrl+Shift+O e Ctrl+Shift+G) | Básico que falta, e no overlay faz ainda mais falta | P |
+| ✅ (0.4.0) **Atalhos globais para mutar e push-to-talk** (hoje só existem Ctrl+Shift+O e Ctrl+Shift+G) | Básico que falta, e no overlay faz ainda mais falta | P |
 | **"Está jogando…" automático.** Lê o nome do jogo em tela cheia (processo em primeiro plano) e mostra na lista de pessoas e no pill | Dá contexto sem configurar nada. Fica só na sessão, sem histórico | P |
 
 ## Qualidade e rede (aproveitando o M10)

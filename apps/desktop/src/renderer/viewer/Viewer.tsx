@@ -1,6 +1,17 @@
-import type { JoinResponse, ViewerTarget } from '@sharescreen/shared'
-import { PASSWORD_HEADER } from '@sharescreen/shared'
-import { Maximize, Minimize, Volume2, VolumeX } from 'lucide-react'
+import type { JoinResponse, MiniViewerState, PointerPing, ViewerTarget } from '@sharescreen/shared'
+import { POINTER_TOPIC } from '@sharescreen/shared'
+import {
+  Lock,
+  Maximize,
+  Maximize2,
+  Minimize,
+  PictureInPicture2,
+  Scaling,
+  Unlock,
+  Volume2,
+  VolumeX,
+  X,
+} from 'lucide-react'
 import { Room, RoomEvent, Track } from 'livekit-client'
 import type {
   RemoteParticipant,
@@ -8,7 +19,9 @@ import type {
   RemoteTrackPublication,
   RemoteVideoTrack,
 } from 'livekit-client'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
+import { Pings } from '../pointer/Pings'
 import { isLocallyMuted, onLocalMutesChange, readLocalMutes } from '../shared/localMutes'
 import { t as translate, useT } from '../shared/i18n'
 import type { LocalMutes } from '../shared/localMutes'
@@ -64,6 +77,22 @@ export function Viewer() {
     participant: RemoteParticipant
   } | null>(null)
   const [choice, setChoice] = useState<QualityChoice>(readQualityChoice)
+  // Apontar na tela: o token desta conexão de assistir e quem escuta os marcadores.
+  const access = useRef<{ token: string; serverUrl: string; target: string } | null>(null)
+  const pingListeners = useRef(new Set<(ping: PointerPing) => void>())
+  const pingSource = useCallback((listener: (ping: PointerPing) => void) => {
+    pingListeners.current.add(listener)
+    return () => void pingListeners.current.delete(listener)
+  }, [])
+  const [mini, setMini] = useState<MiniViewerState | null>(null)
+  const [unlockKey, setUnlockKey] = useState<string | null>(null)
+  /** Onde o quadro do vídeo fica na janela (os marcadores usam a mesma área). */
+  const [frame, setFrame] = useState<{
+    left: number
+    top: number
+    width: number
+    height: number
+  } | null>(null)
   const [statsOpen, setStatsOpen] = useState(false)
   const stats = useStreamQuality(
     screen?.track ?? null,
@@ -84,25 +113,25 @@ export function Viewer() {
         return
       }
       setTarget(who)
+      if (who.mini) setMini({ locked: false, opacity: 1 })
 
-      let access: JoinResponse
+      let joined: JoinResponse
       try {
         const response = await fetch(`${who.serverUrl}/join`, {
           method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            ...(who.password ? { [PASSWORD_HEADER]: who.password } : {}),
-          },
+          // O servidor só dá a conexão de assistir a quem está na call (token de quem assiste).
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${who.token}` },
           body: JSON.stringify({ name: translate('viewer.spectator'), viewer: true }),
         })
         if (!response.ok) throw new Error(String(response.status))
-        access = (await response.json()) as JoinResponse
+        joined = (await response.json()) as JoinResponse
       } catch {
         setPhase('error')
         setMessage(translate('viewer.serverUnreachable', { url: who.serverUrl }))
         return
       }
       if (cancelled) return
+      access.current = { token: joined.token, serverUrl: who.serverUrl, target: who.identity }
 
       const r = new Room({ adaptiveStream: true, dynacast: true })
       room = r
@@ -156,6 +185,21 @@ export function Viewer() {
         .on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
           if (participant.identity === who.identity) setPhase('ended')
         })
+        // Marcadores de quem assiste a mesma transmissão (só os que vêm do servidor).
+        .on(
+          RoomEvent.DataReceived,
+          (payload: Uint8Array, participant?: RemoteParticipant, _k?: unknown, topic?: string) => {
+            if (participant || topic !== POINTER_TOPIC) return
+            try {
+              const ping = JSON.parse(new TextDecoder().decode(payload)) as PointerPing
+              if (ping.type === 'ping' && ping.target === who.identity) {
+                for (const listener of pingListeners.current) listener(ping)
+              }
+            } catch {
+              /* ignora */
+            }
+          },
+        )
         .on(RoomEvent.Disconnected, () => {
           if (!cancelled) {
             setPhase('error')
@@ -164,10 +208,10 @@ export function Viewer() {
         })
 
       try {
-        await r.connect(access.livekitUrl, access.token, { autoSubscribe: false })
+        await r.connect(joined.livekitUrl, joined.token, { autoSubscribe: false })
       } catch {
         setPhase('error')
-        setMessage(translate('viewer.voiceUnreachable', { url: access.livekitUrl }))
+        setMessage(translate('viewer.voiceUnreachable', { url: joined.livekitUrl }))
         return
       }
       if (cancelled) {
@@ -255,6 +299,96 @@ export function Viewer() {
     if (screen) applyQualityChoice(screen.pub, next)
   }
 
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    const measure = () => {
+      const box = video.getBoundingClientRect()
+      if (!video.videoWidth || !box.width || !box.height) return setFrame(null)
+      const scale = Math.min(box.width / video.videoWidth, box.height / video.videoHeight)
+      const width = video.videoWidth * scale
+      const height = video.videoHeight * scale
+      setFrame({
+        left: box.left + (box.width - width) / 2,
+        top: box.top + (box.height - height) / 2,
+        width,
+        height,
+      })
+    }
+    measure()
+    // O <video> aparece (sai do `hidden`) depois do primeiro quadro: mede de novo quando o
+    // tamanho dele muda.
+    const observer = new ResizeObserver(measure)
+    observer.observe(video)
+    video.addEventListener('resize', measure)
+    video.addEventListener('loadedmetadata', measure)
+    window.addEventListener('resize', measure)
+    return () => {
+      observer.disconnect()
+      video.removeEventListener('resize', measure)
+      video.removeEventListener('loadedmetadata', measure)
+      window.removeEventListener('resize', measure)
+    }
+  }, [phase])
+
+  // Miniatura: o main avisa quando destrava pelo atalho.
+  useEffect(() => {
+    if (!target?.mini) return
+    window.platform.hotkeys
+      .voice()
+      .then((h) => setUnlockKey(h.bindings.unlockMini?.label ?? null))
+      .catch(() => undefined)
+    return window.platform.viewer.onMiniState(setMini)
+  }, [target])
+
+  /** Clique na transmissão → marcador na tela de quem transmite (e de quem mais assiste). */
+  const pointTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const point = (event: ReactMouseEvent<HTMLVideoElement>) => {
+    const video = event.currentTarget
+    const a = access.current
+    if (!a || !video.videoWidth || mini?.locked) return
+    // Onde o quadro está de fato dentro do <video> (object-fit: contain deixa faixas).
+    const box = video.getBoundingClientRect()
+    const scale = Math.min(box.width / video.videoWidth, box.height / video.videoHeight)
+    const w = video.videoWidth * scale
+    const h = video.videoHeight * scale
+    const x = (event.clientX - box.left - (box.width - w) / 2) / w
+    const y = (event.clientY - box.top - (box.height - h) / 2) / h
+    if (x < 0 || x > 1 || y < 0 || y > 1) return
+    // Espera para ver se não é um duplo clique (tela cheia).
+    if (pointTimer.current) {
+      clearTimeout(pointTimer.current)
+      pointTimer.current = null
+      return
+    }
+    pointTimer.current = setTimeout(() => {
+      pointTimer.current = null
+      void fetch(`${a.serverUrl}/pointer`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${a.token}` },
+        body: JSON.stringify({ target: a.target, x, y }),
+      }).catch(() => undefined)
+    }, 230)
+  }
+
+  const dragging = useRef(false)
+  const dragHandlers = {
+    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
+      if ((event.target as HTMLElement).closest('button, input')) return
+      dragging.current = true
+      event.currentTarget.setPointerCapture(event.pointerId)
+      window.platform.viewer.drag('start')
+    },
+    onPointerMove: () => {
+      if (dragging.current) window.platform.viewer.drag('move')
+    },
+    onPointerUp: () => {
+      if (!dragging.current) return
+      dragging.current = false
+      window.platform.viewer.drag('end')
+    },
+  }
+
   const toggleFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen()
     else void document.documentElement.requestFullscreen()
@@ -263,6 +397,8 @@ export function Viewer() {
   return (
     <div
       className="viewer"
+      data-mini={mini ? true : undefined}
+      data-locked={mini?.locked || undefined}
       data-chrome={chromeVisible || statsOpen || phase !== 'live' || undefined}
     >
       <video
@@ -271,10 +407,26 @@ export function Viewer() {
         autoPlay
         playsInline
         muted
-        onDoubleClick={toggleFullscreen}
+        title={phase === 'live' && !mini?.locked ? t('viewer.pointHint') : undefined}
+        onClick={point}
+        onDoubleClick={mini ? undefined : toggleFullscreen}
         hidden={phase !== 'live'}
       />
       <audio ref={audioRef} autoPlay />
+      {phase === 'live' && frame && (
+        <div className="viewer__pings" style={frame}>
+          <Pings source={pingSource} />
+        </div>
+      )}
+
+      {mini && (
+        <MiniBar
+          state={mini}
+          name={target?.name ?? ''}
+          unlockKey={unlockKey}
+          dragHandlers={dragHandlers}
+        />
+      )}
 
       {phase !== 'live' && (
         <div className="viewer__state" role="status">
@@ -292,7 +444,7 @@ export function Viewer() {
         </div>
       )}
 
-      <header className="viewer__bar">
+      <header className="viewer__bar" hidden={!!mini}>
         <span className="viewer__who">
           {phase === 'live' && <span className="viewer__live">{t('common.live')}</span>}
           {target?.name ?? t('viewer.stream')}
@@ -332,6 +484,15 @@ export function Viewer() {
           <button
             type="button"
             className="viewer__button"
+            aria-label={t('viewer.mini')}
+            title={t('viewer.miniTitle')}
+            onClick={() => window.platform.viewer.toggleMini()}
+          >
+            <PictureInPicture2 size={18} />
+          </button>
+          <button
+            type="button"
+            className="viewer__button"
             aria-label={fullscreen ? t('viewer.exitFullscreen') : t('viewer.fullscreen')}
             title={fullscreen ? t('viewer.exitFullscreenTitle') : t('viewer.fullscreenTitle')}
             onClick={toggleFullscreen}
@@ -349,6 +510,80 @@ export function Viewer() {
           onChoice={chooseQuality}
         />
       )}
+    </div>
+  )
+}
+
+/** Controles da miniatura: aparecem com o mouse em cima; arrastar pela barra move a janela. */
+function MiniBar({
+  state,
+  name,
+  unlockKey,
+  dragHandlers,
+}: {
+  state: MiniViewerState
+  name: string
+  unlockKey: string | null
+  dragHandlers: Record<string, (event: ReactPointerEvent<HTMLElement>) => void>
+}) {
+  const t = useT()
+  if (state.locked) {
+    return (
+      <span className="mini__lock" title={t('viewer.lockedHint', { key: unlockKey ?? '—' })}>
+        <Lock size={12} aria-hidden />
+      </span>
+    )
+  }
+  return (
+    <div className="mini__bar" {...dragHandlers}>
+      <span className="mini__name">{name}</span>
+      <input
+        type="range"
+        min={0.3}
+        max={1}
+        step={0.05}
+        value={state.opacity}
+        className="mini__opacity"
+        aria-label={t('viewer.opacity')}
+        title={t('viewer.opacity')}
+        onChange={(e) => window.platform.viewer.setMini({ opacity: Number(e.target.value) })}
+      />
+      <button
+        type="button"
+        className="mini__button"
+        aria-label={t('viewer.miniSize')}
+        title={t('viewer.miniSize')}
+        onClick={() => window.platform.viewer.cycleMiniSize()}
+      >
+        <Scaling size={14} />
+      </button>
+      <button
+        type="button"
+        className="mini__button"
+        aria-label={t('viewer.lock')}
+        title={t('viewer.lockTitle', { key: unlockKey ?? '—' })}
+        onClick={() => window.platform.viewer.setMini({ locked: true })}
+      >
+        <Unlock size={14} />
+      </button>
+      <button
+        type="button"
+        className="mini__button"
+        aria-label={t('viewer.backToWindow')}
+        title={t('viewer.backToWindow')}
+        onClick={() => window.platform.viewer.toggleMini()}
+      >
+        <Maximize2 size={14} />
+      </button>
+      <button
+        type="button"
+        className="mini__button"
+        aria-label={t('viewer.close')}
+        title={t('viewer.close')}
+        onClick={() => window.close()}
+      >
+        <X size={14} />
+      </button>
     </div>
   )
 }

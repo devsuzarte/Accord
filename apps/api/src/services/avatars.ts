@@ -1,9 +1,16 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { sessionDir } from './session'
 
-/** Fotos de perfil (PNG, JPEG, WebP ou GIF animado), guardadas na pasta de dados do servidor. */
+/**
+ * Fotos de perfil (PNG, JPEG, WebP ou GIF animado). Ficam na pasta da sessão e somem com ela,
+ * como o chat (o app envia a foto de novo ao entrar).
+ */
 export const MAX_AVATAR_BYTES = 4 * 1024 * 1024
+/** Teto da sessão: sem ele, alguém poderia encher o disco de quem hospeda com fotos. */
+const MAX_TOTAL_BYTES = 150 * 1024 * 1024
+let totalBytes = 0
 
 const types = {
   png: 'image/png',
@@ -34,14 +41,16 @@ function sniff(bytes: Uint8Array): Ext | null {
 }
 
 function directory(): string {
-  const dir = join(process.env.SHARESCREEN_DATA_DIR ?? './data', 'avatars')
+  const dir = join(sessionDir, 'fotos')
   mkdirSync(dir, { recursive: true })
   return dir
 }
 
-export function setAvatarDirectory(dataDir: string): void {
-  process.env.SHARESCREEN_DATA_DIR = dataDir
-}
+// Versões até a 0.3 guardavam as fotos para sempre na pasta de dados: apaga as antigas.
+rmSync(join(process.env.SHARESCREEN_DATA_DIR || './data', 'avatars'), {
+  recursive: true,
+  force: true,
+})
 
 /** Salva e devolve o caminho público ("/avatars/<hash>.<ext>"). Lança erro com mensagem pronta. */
 export function saveAvatar(dataUrl: string): string {
@@ -53,7 +62,11 @@ export function saveAvatar(dataUrl: string): string {
   if (!ext) throw new Error('Use PNG, JPG, WebP ou GIF.')
   const name = `${createHash('sha256').update(bytes).digest('hex').slice(0, 32)}.${ext}`
   const file = join(directory(), name)
-  if (!existsSync(file)) writeFileSync(file, bytes)
+  if (!existsSync(file)) {
+    if (totalBytes + bytes.length > MAX_TOTAL_BYTES) throw new Error('session-full')
+    writeFileSync(file, bytes)
+    totalBytes += statSync(file).size
+  }
   return `/avatars/${name}`
 }
 

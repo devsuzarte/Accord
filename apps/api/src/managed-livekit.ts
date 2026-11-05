@@ -5,7 +5,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { DEFAULT_LIVEKIT_PORT } from '@sharescreen/shared'
 import { env } from './env'
-import { setAvatarDirectory } from './services/avatars'
 
 /**
  * Pacote do servidor: se o `livekit-server(.exe)` estiver na MESMA pasta deste executável,
@@ -61,7 +60,6 @@ export function startManagedLivekit(): ChildProcess | null {
 
   const dataDir = process.env.SHARESCREEN_DATA_DIR || join(baseDir, 'dados')
   mkdirSync(dataDir, { recursive: true })
-  setAvatarDirectory(dataDir)
   const keys = loadOrCreateKeys(join(dataDir, 'chaves.json'))
   const configPath = join(dataDir, 'livekit.yaml')
   if (!existsSync(configPath)) writeFileSync(configPath, livekitConfig(keys))
@@ -77,7 +75,9 @@ export function startManagedLivekit(): ChildProcess | null {
   child.on('exit', (code) => {
     console.error(`[servidor] o LiveKit parou (código ${code}). Feche e abra o servidor de novo.`)
   })
-  const stop = () => child.kill()
+  // SIGKILL: com SIGTERM o LiveKit "drena" (espera a sala esvaziar) e a call continuava viva
+  // com a API já fechada — todo mundo ficava conectado num servidor pela metade.
+  const stop = () => child.kill('SIGKILL')
   process.on('exit', stop)
   process.on('SIGINT', () => process.exit(0))
   process.on('SIGTERM', () => process.exit(0))

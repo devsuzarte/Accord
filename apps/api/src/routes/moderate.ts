@@ -2,6 +2,7 @@ import type { ModerationAction, ModerationError } from '@sharescreen/shared'
 import { Elysia, t } from 'elysia'
 import { TrackSource } from 'livekit-server-sdk'
 import { allowedSources, ROOM, roomService, verifyToken } from '../services/livekit'
+import { banIdentity, isRevoked } from '../services/security'
 import { blocksOf, roleOf, setBlocks, setRole } from '../services/roles'
 
 const actions: ModerationAction[] = [
@@ -34,6 +35,7 @@ export const moderateRoutes = new Elysia().post(
     let requester: { identity: string; room: string }
     try {
       requester = await verifyToken(bearer)
+      if (isRevoked(requester.identity)) throw new Error('revogado')
     } catch {
       set.status = 401
       return { error: 'invalid-session' satisfies ModerationError }
@@ -61,7 +63,15 @@ export const moderateRoutes = new Elysia().post(
     const rooms = roomService()
     try {
       if (action === 'kick') {
-        await rooms.removeParticipant(ROOM, target)
+        // Desconectar = sair agora, perder o acesso do token e 15 min sem voltar (mesmo IP).
+        banIdentity(target)
+        await rooms.removeParticipant(ROOM, target).catch(() => undefined)
+        const all = await rooms.listParticipants(ROOM).catch(() => [])
+        for (const p of all) {
+          if (p.identity.startsWith(`viewer-${target}-`)) {
+            await rooms.removeParticipant(ROOM, p.identity).catch(() => undefined)
+          }
+        }
         return { ok: true }
       }
       if (action === 'make-admin' || action === 'remove-admin') {
@@ -93,8 +103,8 @@ export const moderateRoutes = new Elysia().post(
         permission: {
           canPublish: true,
           canSubscribe: true,
-          canPublishData: true,
-          canUpdateMetadata: true,
+          canPublishData: false,
+          canUpdateMetadata: false,
           canPublishSources: allowedSources(blocks),
         },
         attributes: {

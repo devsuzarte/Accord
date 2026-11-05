@@ -1,6 +1,7 @@
 import type { ChatPrefs, HotkeyInfo, OverlayCorner, PanelTab } from '@sharescreen/shared'
+import { VoiceShortcuts } from './VoiceShortcuts'
 import { useReportSize } from '@sharescreen/ui'
-import { Ghost, MessageSquare, X } from 'lucide-react'
+import { Ghost, MessageSquare, MousePointerClick, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useOverlayState } from '../shared/useOverlayState'
 import { useCallSnapshot } from '../shared/useCallSnapshot'
@@ -149,6 +150,7 @@ function OverlayTab() {
       </div>
 
       <ChatOverlaySwitch />
+      <PointerSwitch />
 
       <div>
         <p className="row__title">{t('overlay.position')}</p>
@@ -170,6 +172,12 @@ function OverlayTab() {
       </div>
 
       <div>
+        <p className="row__title">{t('keys.title')}</p>
+        <p className="row__text">{t('keys.text')}</p>
+        <VoiceShortcuts />
+      </div>
+
+      <div>
         <p className="row__title">{t('overlay.hotkeys')}</p>
         <ul className="keys">
           {hotkeys.map((h) => (
@@ -181,6 +189,46 @@ function OverlayTab() {
           ))}
         </ul>
       </div>
+    </div>
+  )
+}
+
+/** Marcadores de quem assiste na minha tela (o pill lê a mesma chave). */
+function PointerSwitch() {
+  const t = useT()
+  const read = () => {
+    try {
+      return localStorage.getItem('sharescreen.pointer.allow') !== '0'
+    } catch {
+      return true
+    }
+  }
+  const [allowed, setAllowed] = useState(read)
+  const toggle = () => {
+    const next = !allowed
+    setAllowed(next)
+    try {
+      localStorage.setItem('sharescreen.pointer.allow', next ? '1' : '0')
+    } catch {
+      /* ignora */
+    }
+  }
+  return (
+    <div className="row">
+      <div>
+        <p className="row__title">
+          <MousePointerClick size={15} /> {t('overlay.pointerTitle')}
+        </p>
+        <p className="row__text">{t('overlay.pointerText')}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={allowed}
+        aria-label={t('overlay.pointerTitle')}
+        className="switch"
+        onClick={toggle}
+      />
     </div>
   )
 }

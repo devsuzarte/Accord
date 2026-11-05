@@ -1437,3 +1437,83 @@ kbd[data-broken] {
   gap: 8px;
   margin-top: 4px;
 }
+
+/* Parar de hospedar com gente na call */
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--status-red) 10%, var(--material-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--status-red) 35%, transparent);
+}
+
+.confirm__title {
+  margin: 0;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.rotate {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.segments__item[aria-checked='true'] {
+  color: var(--text-strong);
+  background: var(--material-raised-hover);
+  box-shadow: inset 0 0 0 1px var(--material-border);
+}
+
+.segments__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.segments--spaced {
+  margin: 8px 0 6px;
+}
+
+/* Atalhos que a pessoa escolhe */
+
+.keys__item--edit {
+  flex-wrap: nowrap;
+  min-height: 32px;
+}
+
+.keys__item--edit > span:first-child {
+  flex: 1;
+}
+
+.keys__pick {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  background: var(--material-raised);
+  color: var(--text-normal);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.keys__pick:hover {
+  background: var(--material-raised-hover);
+}
+
+.keys__pick[data-waiting] {
+  color: var(--text-strong);
+  box-shadow: inset 0 0 0 1px var(--brand);
+  background: color-mix(in srgb, var(--brand) 18%, var(--material-raised));
+}
+
+.keys__none {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+}

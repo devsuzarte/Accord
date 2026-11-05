@@ -90,6 +90,9 @@ O que já existe:
 - **Senha do canal:** quem hospeda define (ou troca com o canal aberto); os canais com senha aparecem com cadeado na lista.
 - **Troca de host:** se o PC de quem hospeda cair, a sessão passa para quem entrou primeiro, que abre o próprio servidor com a cópia da sessão (senha, chat, anexos, silêncios); os outros reconectam no IP dele sozinhos.
 - **Volume por pessoa:** 0% a 200%, só para você, no clique direito da lista de pessoas.
+- **Segurança revisada** ([14](docs/14-seguranca.md)): ninguém se passa pelo dono nem assiste escondido, convite sem a senha, limite de tentativas, desconectar bloqueia por 15 minutos, sem programas pelo chat.
+- **Aperte para falar** e atalhos de mutar/ensurdecer que funcionam com o jogo em foco (inclusive botões laterais do mouse).
+- **Apontar na tela de quem transmite** e **miniatura da transmissão sobre o jogo**.
 - **Convites por link:** "Copiar convite" gera um link que abre o Accord direto no canal (com a senha, se tiver). Funciona clicado no WhatsApp ou no Discord.
 - **Qualidade no viewer:** selo com resolução e fps, painel com taxa, perda, atraso e travadas, diagnóstico de onde está o gargalo e opção Econômica (360p).
 - **Entrega:** pacote do servidor de um clique, instalador, **atualização automática** pelo GitHub Releases, publicada sozinha pelo GitHub Actions ao criar uma tag ([12](docs/12-publicar-versao.md)), logs e diagnóstico.

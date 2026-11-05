@@ -60,6 +60,12 @@ export class SessionMirror {
     }
   }
 
+  /** O host avisou que vai sair: copia agora (espera a cópia em andamento terminar). */
+  async pullNow(): Promise<void> {
+    for (let i = 0; i < 40 && this.busy; i++) await new Promise((r) => setTimeout(r, 100))
+    await this.pull()
+  }
+
   private async pull(): Promise<void> {
     const request = this.request
     if (!request || this.busy) return

@@ -41,14 +41,19 @@ App desktop de voz + compartilhamento de tela em overlay, inspirado no Discord. 
 - Ícones: `apps/desktop/resources/` (`logo.svg` original, `icon.png`/`icon.ico` do app, `tray.png`/`tray@2x.png`)
 - Build do Windows a partir do Linux funciona com wine + wine32 (o NSIS roda o desinstalador no wine) e o `@koromix/koffi-win32-x64` presente em node_modules
 
-- Senha do canal: cabeçalho `x-accord-password` (`PASSWORD_HEADER`); a senha vive em `apps/api/src/services/session.ts` (env `SHARESCREEN_PASSWORD` ao abrir; `POST /session/password` só do próprio PC)
+- Senha do canal: cabeçalho `x-accord-password` (`PASSWORD_HEADER`); a senha vive em `apps/api/src/services/session.ts` (env `SHARESCREEN_PASSWORD` ao abrir; `POST /session/password` só do app de quem hospeda, com a chave do app)
 - Chat: servidor guarda em memória + pasta temporária (`routes/session.ts`) e avisa pela sala (`sendData`, tópico `accord.chat`); o pill guarda as mensagens (`pill/call/chat.ts`) e publica `ChatState` → main (`overlay/chat-window.ts`) → janela `chat` (modos `expanded`/`mini`). A janela de chat envia direto ao servidor com o token
 - Troca de host: `pill/call/migration.ts` (fila por `joinedAt`, atributo `addrs`), `main/network/session-mirror.ts` (cópia a cada 10 s em userData/sessao-copia) e `HostService.start({ restore: true })` → env `SHARESCREEN_RESTORE`
 - Vozes tocam pelo WebAudio (`webAudioMix`): volume, ensurdecer e "mutar para mim" são `participant.setVolume`, nunca `<audio>.muted`
 - Atualização automática: `src/main/updater.ts` (electron-updater, GitHub). Publicar: `docs/12-publicar-versao.md`
-- Convites: `packages/shared/src/invite.ts` (`accord://join?h=&n=&p=` e a página `site/convite/` no GitHub Pages, que só repassa). Main: `src/main/invites.ts` (protocolo, `second-instance`) → `InviteReceived` → `panel/InviteCard.tsx`. `CallSnapshot.server` dá URL/nome/senha da chamada atual
+- Convites: `packages/shared/src/invite.ts` (`accord://join?h=&n=&k=` com a chave de convite, nunca a senha; e a página `site/convite/` no GitHub Pages, que só repassa). Main: `src/main/invites.ts` (protocolo, `second-instance`) → `InviteReceived` → `panel/InviteCard.tsx`. `CallSnapshot.server` dá URL/nome/chave da chamada atual
 - Qualidade no viewer: `renderer/viewer/quality.ts` (`getRTCStatsReport` a cada 1 s + `connectionQuality` de quem transmite); Econômica = `setVideoQuality(LOW)` (camada de 360p do simulcast)
 - CI e release: `.github/workflows/` (`ci.yml`; `release.yml` publica ao empurrar tag `v*` igual à versão do desktop; `pages.yml` publica `site/`)
+- Segurança (docs/14): token sem `canUpdateOwnMetadata`/`canPublishData`; nome/foto/addrs via `POST /me`; dono e rotas do host exigem `SHARESCREEN_HOST_KEY` (o main injeta `x-accord-host-key` nos pedidos do app a 127.0.0.1); senha só como hash; convite = `invite:<chave>` no cabeçalho da senha; `services/security.ts` (limites, banimento, Host)
+- Fim da sessão: `HostService.stop('end' | 'handoff')` → `POST /session/end`; avisos da sala no tópico `accord.session` (`ended`, `handoff`, `invite-rotated`)
+- Atalhos de voz: `main/hotkeys.ts` (GetAsyncKeyState no Windows, globalShortcut fora), hotkeys.json em userData; PTT = `track.enabled` no pill. Testes: `SHARESCREEN_FAKE_HOLD=1` deixa ligar o modo e o atalho vem por `CallCommand { type: 'ptt' }`
+- Apontar: viewer → `POST /pointer` → tópico `accord.pointer` → pill (se transmitindo) → `PointerWindow` (página `pointer`) + `Pings` no viewer
+- Miniatura: `ViewerManager.toggleMini` troca a janela (sem moldura, `focusable: false`, content protection); travar = `setIgnoreMouseEvents`
 - Windows: `disable-features=CalculateNativeWinOcclusion` evita janelas do overlay "congeladas" depois de bloqueio/inatividade
 
 ## Convenções

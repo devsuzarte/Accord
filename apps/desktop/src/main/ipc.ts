@@ -13,6 +13,7 @@ import type {
   ShareRequest,
   Size,
   ViewerTarget,
+  PointerPing,
 } from '@sharescreen/shared'
 import type { HotkeyService } from './hotkeys'
 import { tm } from './i18n'
@@ -25,6 +26,7 @@ import type { InviteService } from './invites'
 import type { ChatWindow } from './overlay/chat-window'
 import type { SessionMirror } from './network/session-mirror'
 import type { ShareService } from './share/share-service'
+import type { PointerWindow } from './overlay/pointer-window'
 import type { ViewerManager } from './share/viewer-manager'
 import type { OverlayManager } from './overlay/overlay-manager'
 
@@ -77,6 +79,7 @@ function isCallCommand(value: unknown): value is CallCommand {
     )
   }
   if (v.type === 'watch') return typeof v.identity === 'string' && v.identity.length < 128
+  if (v.type === 'ptt') return typeof v.down === 'boolean'
   return (
     v.type === 'join' &&
     typeof v.name === 'string' &&
@@ -84,7 +87,9 @@ function isCallCommand(value: unknown): value is CallCommand {
     v.name.length <= 32 &&
     typeof v.serverUrl === 'string' &&
     /^https?:\/\//.test(v.serverUrl) &&
-    (v.password === undefined || v.password === null || typeof v.password === 'string')
+    (v.password === undefined ||
+      v.password === null ||
+      (typeof v.password === 'string' && v.password.length <= 96))
   )
 }
 
@@ -101,6 +106,8 @@ const idleCall: CallSnapshot = {
   sharing: null,
   channelName: null,
   server: null,
+  successor: null,
+  pushToTalk: null,
   participants: [],
   error: null,
 }
@@ -121,6 +128,25 @@ function isShareRequest(value: unknown): value is ShareRequest {
   )
 }
 
+function isPointerPing(value: unknown): value is PointerPing {
+  const v = value as PointerPing
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    v.type === 'ping' &&
+    typeof v.id === 'string' &&
+    v.id.length <= 16 &&
+    typeof v.from === 'string' &&
+    v.from.length <= 32 &&
+    typeof v.x === 'number' &&
+    typeof v.y === 'number' &&
+    v.x >= 0 &&
+    v.x <= 1 &&
+    v.y >= 0 &&
+    v.y <= 1
+  )
+}
+
 function isViewerTarget(value: unknown): value is ViewerTarget {
   const v = value as ViewerTarget
   return (
@@ -130,7 +156,8 @@ function isViewerTarget(value: unknown): value is ViewerTarget {
     typeof v.name === 'string' &&
     typeof v.serverUrl === 'string' &&
     /^https?:\/\//.test(v.serverUrl) &&
-    (v.password === undefined || v.password === null || typeof v.password === 'string')
+    typeof v.token === 'string' &&
+    v.token.length < 4096
   )
 }
 
@@ -139,6 +166,7 @@ export interface IpcDependencies {
   overlay: OverlayManager
   hotkeys: HotkeyService
   share: ShareService
+  pointer: PointerWindow
   viewers: ViewerManager
   people: PeopleWindow
   settings: SettingsStore
@@ -164,6 +192,7 @@ export function registerIpcHandlers({
   overlay,
   hotkeys,
   share,
+  pointer,
   viewers,
   people,
   settings,
@@ -250,9 +279,12 @@ export function registerIpcHandlers({
     if (password !== null && (typeof password !== 'string' || password.length > 64)) return false
     return host.setPassword(password)
   })
-  ipcMain.on(IpcChannel.HostStop, (event) => {
-    if (fromPanel(event)) host.stop()
+  ipcMain.on(IpcChannel.HostStop, (event, mode: unknown) => {
+    if (fromPanel(event)) void host.stop(mode === 'handoff' ? 'handoff' : 'end')
   })
+  ipcMain.handle(IpcChannel.HostRotateInvite, (event) =>
+    fromPanel(event) ? host.rotateInvite() : host.getState(),
+  )
 
   // Chamada: a conexão vive no pill; o main só repassa e guarda o último retrato.
   let lastCall: CallSnapshot = idleCall
@@ -304,6 +336,33 @@ export function registerIpcHandlers({
     if (fromPill(event) && isViewerTarget(target)) viewers.open(target)
   })
   ipcMain.handle(IpcChannel.ViewerGetTarget, (event) => viewers.targetFor(event.sender.id))
+  // Marcadores na tela de quem transmite (o pill recebe do servidor e pede para mostrar).
+  ipcMain.on(IpcChannel.PointerShow, (event, ping: unknown) => {
+    if (fromPill(event) && isPointerPing(ping)) pointer.show(ping)
+  })
+  ipcMain.on(IpcChannel.ViewerToggleMini, (event) => viewers.toggleMini(event.sender.id))
+  ipcMain.on(IpcChannel.ViewerMiniSet, (event, patch: unknown) => {
+    if (typeof patch === 'object' && patch !== null) {
+      viewers.setMini(event.sender.id, patch as { locked?: boolean; opacity?: number })
+    }
+  })
+  ipcMain.on(IpcChannel.ViewerMiniSize, (event) => viewers.cycleSize(event.sender.id))
+  ipcMain.on(IpcChannel.ViewerDrag, (event, phase: unknown) => {
+    if (phase === 'start' || phase === 'move' || phase === 'end') {
+      viewers.drag(event.sender.id, phase)
+    }
+  })
+
+  // Atalhos de voz (mutar, ensurdecer, push-to-talk) e da miniatura.
+  ipcMain.handle(IpcChannel.VoiceHotkeysGet, () => hotkeys.voice())
+  ipcMain.handle(IpcChannel.VoiceHotkeysSet, (event, patch: unknown) =>
+    fromPanel(event) && typeof patch === 'object' && patch !== null
+      ? hotkeys.setVoice(patch as Parameters<HotkeyService['setVoice']>[0])
+      : hotkeys.voice(),
+  )
+  ipcMain.on(IpcChannel.VoiceHotkeyCapture, (event, active: unknown) => {
+    if (fromPanel(event) && typeof active === 'boolean') hotkeys.setCapturing(active)
+  })
 
   // Lista de pessoas.
   ipcMain.on(IpcChannel.PeopleToggle, (event) => {
@@ -375,6 +434,9 @@ export function registerIpcHandlers({
   })
   ipcMain.handle(IpcChannel.SessionSaveMessages, (event, messages: unknown) => {
     if (fromPill(event) && Array.isArray(messages)) mirror.saveMessages(messages as ChatMessage[])
+  })
+  ipcMain.handle(IpcChannel.SessionMirrorNow, async (event) => {
+    if (fromPill(event)) await mirror.pullNow()
   })
 
   // Convites (accord://).

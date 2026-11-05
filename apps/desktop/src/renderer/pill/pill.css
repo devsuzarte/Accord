@@ -293,3 +293,18 @@
   background: var(--status-red);
   color: #fff;
 }
+
+/* Aperte para falar: selo ao lado do nome; acende enquanto segura o atalho. */
+.ptt {
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-muted) 16%, transparent);
+}
+
+.ptt[data-held] {
+  color: var(--status-green);
+  background: color-mix(in srgb, var(--status-green) 18%, transparent);
+}
