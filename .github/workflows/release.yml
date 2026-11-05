@@ -1,7 +1,9 @@
 # Gera o instalador num Windows de verdade e publica a versão no GitHub Releases.
 #
-# Como usar: aumente a versão nos três package.json, faça o commit e envie uma tag:
-#   git tag v0.3.0 && git push origin v0.3.0
+# Como usar: aumente a versão nos três package.json, faça o commit e então
+#   - pelo site: Actions → Release → Run workflow → marque "Publicar a versão"; ou
+#   - pelo git: git tag v0.3.0 && git push origin v0.3.0
+# Sem marcar "Publicar", a execução manual só gera o instalador como artefato.
 # Tag com hífen (ex.: v0.3.0-beta.1) vira pré-lançamento: não chega na atualização automática.
 name: Release
 
@@ -9,6 +11,11 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publicar a versão (cria a tag v<versão> e a release)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -60,12 +67,22 @@ jobs:
         run: bun run package
 
       - name: Publicar a versão
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $tag = "${{ github.ref_name }}"
+          if ("${{ github.ref }}".StartsWith('refs/tags/v')) {
+            $tag = "${{ github.ref_name }}"
+          } else {
+            $tag = 'v' + (Get-Content apps/desktop/package.json | ConvertFrom-Json).version
+            gh release view $tag 2>$null
+            if ($LASTEXITCODE -eq 0) {
+              Write-Error "A release $tag já existe. Aumente a versão nos package.json antes de publicar."
+              exit 1
+            }
+            $global:LASTEXITCODE = 0
+          }
           $version = $tag.TrimStart('v')
           $files = @(
             "release/app/Accord-Setup-$version.exe",
@@ -74,10 +91,11 @@ jobs:
           )
           $extra = @()
           if ($tag.Contains('-')) { $extra += '--prerelease' } else { $extra += '--latest' }
-          gh release create $tag @files --title "Accord $version" --generate-notes @extra
+          # --target: sem tag ainda (execução manual), o gh cria a tag neste commit.
+          gh release create $tag @files --title "Accord $version" --generate-notes --target "${{ github.sha }}" @extra
 
       - name: Guardar os arquivos (execução manual)
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') && !inputs.publish }}
         uses: actions/upload-artifact@v4
         with:
           name: accord-windows
