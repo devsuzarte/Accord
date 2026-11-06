@@ -1,0 +1,8 @@
+# As actions ficam presas a um commit exato (mais seguro). O Dependabot abre um PR quando
+# sai versão nova, e o mantenedor revisa como qualquer outro PR.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

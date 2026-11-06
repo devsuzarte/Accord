@@ -486,16 +486,19 @@ function ServerCard({
                   ? t('channels.people.one')
                   : t('channels.people.other', { n: channel.count ?? channel.people.length })}
             </span>
-            <button
-              type="button"
-              className="action action--small action--primary"
-              disabled={disabled}
-              aria-label={t('channels.joinIn', { name: channelLabel(channel.id, channel.name) })}
-              onClick={start}
-            >
-              {joining ? <Loader size={14} className="spin" /> : <LogIn size={14} />}
-              {t('channels.joinButton')}
-            </button>
+            {/* Pedindo a senha: o único "Entrar" é o do campo de senha, logo abaixo. */}
+            {!(server.locked && asking) && (
+              <button
+                type="button"
+                className="action action--small action--primary"
+                disabled={disabled}
+                aria-label={t('channels.joinIn', { name: channelLabel(channel.id, channel.name) })}
+                onClick={start}
+              >
+                {joining ? <Loader size={14} className="spin" /> : <LogIn size={14} />}
+                {t('channels.joinButton')}
+              </button>
+            )}
           </li>
         ))}
       </ul>
@@ -518,7 +521,7 @@ function ServerCard({
             className="action action--small action--primary"
             disabled={disabled || !password}
           >
-            <LogIn size={14} />
+            {joining ? <Loader size={14} className="spin" /> : <LogIn size={14} />}
             {t('channels.joinButton')}
           </button>
         </form>
