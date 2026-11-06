@@ -1,86 +1,87 @@
-# Como contribuir com o Accord
+# Contributing to Accord
 
-Obrigado por querer ajudar. O Accord é mantido por Benjamin Suzarte
-([devsuzarte](https://github.com/devsuzarte)), que revisa e decide o que entra. Este guia diz
-como propor uma mudança e o que esperar da revisão.
+Thanks for wanting to help. Accord is maintained by Benjamin Suzarte
+([devsuzarte](https://github.com/devsuzarte)), who reviews every change and decides what gets
+in. This guide explains how to propose a change and what to expect from review.
 
-_English: contributions are welcome in English or Portuguese. Open an issue first for anything
-bigger than a small fix, then send a pull request against `main`. The maintainer reviews every
-PR and merges it, asks for changes, or closes it with a reason._
+Issues and pull requests are welcome in English or Portuguese.
 
-## Antes de começar
+## Before you start
 
-- **Correção pequena** (texto, bug óbvio, tradução): pode mandar o pull request direto.
-- **Algo maior** (feature nova, mudança de comportamento, dependência nova, mudança de
-  arquitetura): abra uma **issue** antes e espere um "pode seguir". Isso evita você gastar tempo
-  num caminho que não vai ser aceito.
-- **Falha de segurança**: nunca em issue ou PR público. Veja o [SECURITY.md](SECURITY.md).
-- Procure issues marcadas com `bom primeiro passo` se quiser um lugar para começar.
+- **Small fix** (typo, obvious bug, translation): send the pull request directly.
+- **Something bigger** (new feature, behavior change, new dependency, architecture change):
+  open an **issue** first and wait for a "go ahead". That keeps you from spending time on a
+  direction that won't be accepted.
+- **Security issue**: never in a public issue or PR. See [SECURITY.md](SECURITY.md).
+- Look for issues labeled `good first issue` if you want a place to start.
 
-## Preparar o ambiente
+## Setting up
 
-Precisa do [Bun](https://bun.sh) 1.4.4. Para testar voz e tela, siga o "Testar chamada sozinho"
-do [CLAUDE.md](CLAUDE.md) (o servidor de voz de desenvolvimento e duas instâncias do app).
+You need [Bun](https://bun.sh) 1.4.4. To test voice and screen sharing, follow "Testing a call
+on your own" in [CLAUDE.md](CLAUDE.md) (the development voice server and two app instances).
 
 ```bash
 bun install
 bun run dev
 ```
 
-## O pull request
+## The pull request
 
-1. Faça um fork e crie um branch a partir de `main` (`fix/microfone-some`, `feat/salas-rapidas`).
-2. Uma mudança por PR. PR pequeno é revisado mais rápido.
-3. Antes de enviar, rode:
+1. Fork the repository and create a branch from `main` (`fix/mic-disappears`,
+   `feat/quick-rooms`).
+2. One change per PR. Small PRs get reviewed faster.
+3. Before sending, run:
    ```bash
    bun run typecheck
    bun run lint
    bun run format
    ```
-   O GitHub roda as mesmas verificações (CI) e o PR só entra com elas passando.
-4. Preencha o modelo do PR: o que muda, por quê, como testou e prints se mexeu na interface.
-5. Se o PR resolve uma issue, escreva `Resolve #123` na descrição.
+   GitHub runs the same checks (CI), and a PR only gets in when they pass.
+4. Fill in the PR template: what changes, why, how you tested it, and screenshots if you
+   touched the interface.
+5. If the PR fixes an issue, write `Fixes #123` in the description.
 
-### Regras do projeto
+### Project rules
 
-Estão no [CLAUDE.md](CLAUDE.md) e em `docs/`. As que mais pegam:
+They live in [CLAUDE.md](CLAUDE.md) and `docs/`. The ones people trip on most:
 
-- **Textos da interface** sempre nos dois idiomas: `packages/shared/src/i18n/pt-BR.ts` e
-  `en.ts`, com as mesmas chaves. Nada de texto fixo no componente.
-- **Cores** só pelos tokens (`packages/ui`) ou `color-mix`. Nada de cor fixa em hexadecimal.
-- **Nunca** usar marca, ícones, fontes ou sons do Discord. Ícones são do Lucide.
-- O renderer não importa nada do Electron: o acesso ao sistema passa pelo `PlatformBridge`.
-- Canal IPC novo segue o caminho `shared/ipc.ts` → `PlatformBridge` → preload → `main/ipc.ts`,
-  com o conteúdo validado no main.
-- Mudou uma decisão? Atualize o documento em `docs/` no mesmo PR.
-- Mudança em segurança (API, tokens, IPC, permissões) precisa explicar o risco no PR.
+- **Interface text** always in both languages: `packages/shared/src/i18n/pt-BR.ts` and
+  `en.ts`, with the same keys. No hard-coded text in components.
+- **Colors** only through the tokens (`packages/ui`) or `color-mix`. No fixed hex colors.
+- **Never** use Discord's brand, icons, fonts or sounds. Icons come from Lucide.
+- The renderer imports nothing from Electron: system access goes through the `PlatformBridge`.
+- A new IPC channel follows `shared/ipc.ts` → `PlatformBridge` → preload → `main/ipc.ts`, with
+  the payload validated in main.
+- Changed a decision? Update the document in `docs/` in the same PR. Documentation is written
+  in English.
+- Security-related changes (API, tokens, IPC, permissions) must explain the risk in the PR.
 
-## Como a revisão funciona
+## How review works
 
-Todo PR é revisado pelo mantenedor (o GitHub pede a revisão automaticamente pelo
-[CODEOWNERS](.github/CODEOWNERS)). O resultado é um destes:
+Every PR is reviewed by the maintainer (GitHub requests the review automatically through
+[CODEOWNERS](.github/CODEOWNERS)). The outcome is one of these:
 
-| Resposta | O que significa | O que você faz |
+| Response | What it means | What you do |
 |---|---|---|
-| **Aprovado** | Pode entrar como está | Nada: o mantenedor faz o merge |
-| **Pede mudanças** | A ideia é boa, mas algo precisa mudar | Ajuste no mesmo branch e responda aos comentários; o PR é revisto |
-| **Comentário / pergunta** | Falta entender algo antes de decidir | Responda no PR |
-| **Fechado** | Não vai entrar (fora do rumo do projeto, duplicado, sem resposta) | O motivo fica escrito no PR |
+| **Approved** | It can go in as it is | Nothing: the maintainer merges it |
+| **Changes requested** | The idea is good, but something needs to change | Update the same branch and reply to the comments; the PR is reviewed again |
+| **Comment / question** | Something needs clarifying before a decision | Reply in the PR |
+| **Closed** | It won't go in (out of the project's direction, duplicate, no reply) | The reason is written in the PR |
 
-- Comentário marcado **"sugestão"** ou **"opcional"** não bloqueia o merge; o resto, sim.
-- PR parado por 30 dias esperando o autor pode ser fechado (dá para reabrir depois).
-- O merge é feito pelo mantenedor, em geral como **squash** (um commit por PR).
-- A decisão final sobre o que entra é do mantenedor. Não leve para o lado pessoal: às vezes
-  uma boa ideia não cabe no momento do projeto.
+- Comments marked **"suggestion"** or **"optional"** don't block the merge; everything else does.
+- A PR waiting on its author for 30 days may be closed (it can be reopened later).
+- The maintainer does the merge, as a **squash** (one commit per PR).
+- The final call on what gets in belongs to the maintainer. Don't take it personally:
+  sometimes a good idea just doesn't fit the project right now.
 
-## Licença das contribuições
+## Licensing of contributions
 
-O Accord é licenciado sob a [Apache License 2.0](LICENSE). Ao enviar um pull request, você
-concorda que a sua contribuição entra sob essa mesma licença (seção 5 da Apache 2.0) e declara
-que tem o direito de enviá-la: o código é seu, ou de uma fonte compatível com a Apache 2.0, com
-o crédito indicado. Não envie código copiado de projetos com licença incompatível nem de
-projetos fechados.
+Accord is licensed under the [Apache License 2.0](LICENSE). By submitting a pull request, you
+agree that your contribution is licensed under the same license (section 5 of Apache 2.0) and
+you state that you have the right to submit it: the code is yours, or comes from a source
+compatible with Apache 2.0 with proper credit. Don't submit code copied from projects with an
+incompatible license or from closed-source projects.
 
-## Conduta
+## Conduct
 
-Todos seguem o [código de conduta](CODE_OF_CONDUCT.md).
+Everyone follows the [code of conduct](CODE_OF_CONDUCT.md).

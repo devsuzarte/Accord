@@ -1,10 +1,7 @@
-# Third-party software / Software de terceiros
+# Third-party software
 
 The Accord source code is licensed under the Apache License 2.0 (see `LICENSE` and `NOTICE`). The installer and the server
 package also ship the following third-party software, each under its own license.
-
-O código do Accord é licenciado sob a Apache License 2.0 (veja `LICENSE` e `NOTICE`). O instalador e o pacote do servidor também
-levam os programas abaixo, cada um com a sua licença.
 
 | Component | Version | License | Where |
 |---|---|---|---|

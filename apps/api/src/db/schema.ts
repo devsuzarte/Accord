@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm'
 import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 /**
- * Esquema inicial — docs/02-arquitetura.md › Modelo de dados.
+ * Esquema inicial — docs/02-architecture.md › Modelo de dados.
  * Presença (quem está em qual canal) NÃO fica no banco: vive em memória na API.
  */
 

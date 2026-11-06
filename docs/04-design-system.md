@@ -1,137 +1,139 @@
-# 04 — Design system e overlay
+# 04 — Design system and overlay
 
-## Diretriz
+## Guideline
 
-Visual **escuro, denso e arredondado, no estilo do Discord**: fundos cinza-azulados em camadas, um acento azul-violeta, verde para "falando/online" e vermelho para "mudo/ao vivo/perigo".
+A **dark, dense and rounded look, Discord-style**: layered blue-gray backgrounds, a blue-violet accent, green for "speaking/online" and red for "muted/live/danger".
 
-**Limites (para não virar cópia):** sem o nome, o logo ou o mascote do Discord, sem a fonte proprietária (gg sans) e sem os ícones dele. Os sons de entrada e saída também são próprios. O app tem nome e ícone próprios.
+**Limits (so it doesn't become a copy):** no Discord name, logo or mascot, no proprietary font (gg sans) and none of its icons. The join and leave sounds are our own too. The app has its own name and icon.
 
-> **Fonte da verdade dos valores:** `packages/ui/src/styles/tokens.css`. Os blocos abaixo são a referência original; o código evoluiu (fonte Figtree, material do overlay, `--frame-pad`).
+> **Source of truth for values:** `packages/ui/src/styles/tokens.css`. The blocks below are the original reference; the code has evolved (Figtree font, overlay material, `--frame-pad`).
 
-## Tokens de cor (tema escuro)
+## Color tokens (dark theme)
 
-> **Valores de referência** para um tema escuro estilo Discord, para ajustar à vontade. Tudo em CSS custom properties em `packages/ui/tokens.css`, então trocar a paleta inteira é mexer num arquivo só.
+> **Reference values** for a Discord-style dark theme, to adjust freely. Everything is CSS custom properties in `packages/ui/tokens.css`, so swapping the whole palette means touching one file.
 
 ```css
 :root {
-  /* Superfícies (da mais funda para a mais clara) */
+  /* Surfaces (from deepest to lightest) */
   --bg-floating:   #111214;  /* tooltips, menus, overlay */
-  --bg-tertiary:   #1E1F22;  /* barra de servidores / fundo da janela */
-  --bg-secondary:  #2B2D31;  /* barra lateral de canais */
-  --bg-primary:    #313338;  /* área de conteúdo */
+  --bg-tertiary:   #1E1F22;  /* server bar / window background */
+  --bg-secondary:  #2B2D31;  /* channel sidebar */
+  --bg-primary:    #313338;  /* content area */
   --bg-modifier-hover:    rgba(78, 80, 88, 0.30);
   --bg-modifier-selected: rgba(78, 80, 88, 0.60);
 
-  /* Texto */
+  /* Text */
   --text-strong:   #F2F3F5;
   --text-normal:   #DBDEE1;
   --text-muted:    #949BA4;
   --interactive:        #B5BAC1;
   --interactive-hover:  #DBDEE1;
 
-  /* Marca e status */
+  /* Brand and status */
   --brand:         #5865F2;
   --brand-hover:   #4752C4;
-  --status-green:  #23A55A;  /* falando / online / conectado */
-  --status-yellow: #F0B232;  /* reconectando / ausente */
-  --status-red:    #F23F43;  /* mudo / ao vivo / perigo */
+  --status-green:  #23A55A;  /* speaking / online / connected */
+  --status-yellow: #F0B232;  /* reconnecting / away */
+  --status-red:    #F23F43;  /* muted / live / danger */
 
   /* Overlay */
   --overlay-bg:    rgba(17, 18, 20, 0.82);
   --overlay-blur:  12px;
 
-  /* Forma */
+  /* Shape */
   --radius-sm: 4px;  --radius-md: 8px;  --radius-lg: 16px;  --radius-pill: 999px;
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px;
 
-  /* Tipografia */
+  /* Typography */
   --font-sans: "Noto Sans", "Segoe UI", system-ui, sans-serif;
   --font-size-xs: 12px; --font-size-sm: 14px; --font-size-md: 16px; --font-size-lg: 20px;
 
-  /* Movimento */
+  /* Motion */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --dur-fast: 120ms; --dur-normal: 200ms;
 }
 ```
 
-Fonte: **Figtree** variável (SIL OFL), incluída no app, sem depender de rede. Geométrica e amigável como a do Discord, e legível em 12–14 px.
+Font: variable **Figtree** (SIL OFL), bundled with the app, with no network dependency. Geometric and friendly like Discord's, and readable at 12–14 px.
 
-**Acessibilidade:** texto normal ≥ 4.5:1 sobre o fundo. Status nunca só por cor: mudo também tem ícone, e falando também tem anel.
+**Accessibility:** normal text ≥ 4.5:1 against the background. Status is never conveyed by color alone: muted also has an icon, and speaking also has a ring.
 
-## Ícones
+## Icons
 
-**[Decisão] Lucide** (licença ISC): traço arredondado, combina com o estilo. Tamanho 20 px nos controles e 14 px nos selos.
+**[Decision] Lucide** (ISC license): rounded strokes that match the style. 20 px in controls and 14 px in badges.
 
-| Ação | Ícone Lucide |
+| Action | Lucide icon |
 |---|---|
-| Microfone ligado / mudo | `mic` / `mic-off` |
-| Ensurdecer | `headphones` / `headphone-off` |
-| Compartilhar tela | `monitor-up` |
-| Parar transmissão | `monitor-x` |
-| Sair da chamada | `phone-off` |
-| Configurações | `settings` |
-| Recolher / expandir | `chevrons-left` / `chevrons-right` |
-| Arrastar | `grip-vertical` |
-| Canal de voz | `volume-2` |
-| Assistir | `eye` |
+| Mic on / muted | `mic` / `mic-off` |
+| Deafen | `headphones` / `headphone-off` |
+| Share screen | `monitor-up` |
+| Stop streaming | `monitor-x` |
+| Leave the call | `phone-off` |
+| Settings | `settings` |
+| Collapse / expand | `chevrons-left` / `chevrons-right` |
+| Drag | `grip-vertical` |
+| Voice channel | `volume-2` |
+| Watch | `eye` |
 
-## Componentes base (`packages/ui`)
+## Base components (`packages/ui`)
 
-`Avatar` (tamanhos 20/24/32/40/80, com anel de fala, selo de status, fallback com iniciais) · `UserPill` · `IconButton` (variações default/active/danger e tooltip) · `Tooltip` · `ContextMenu` · `Modal` · `Tabs` · `Slider` · `Toggle` · `Select` · `Toast` · `ChannelItem` · `SourceCard` (seletor de tela).
+`Avatar` (sizes 20/24/32/40/80, with speaking ring, status badge, initials fallback) · `UserPill` · `IconButton` (default/active/danger variants and tooltip) · `Tooltip` · `ContextMenu` · `Modal` · `Tabs` · `Slider` · `Toggle` · `Select` · `Toast` · `ChannelItem` · `SourceCard` (screen picker).
 
-Estados obrigatórios em todo componente interativo: default, hover, active/pressed, focus-visible (anel `--brand`), disabled.
+Required states on every interactive component: default, hover, active/pressed, focus-visible (`--brand` ring), disabled.
 
-## Overlay — anatomia
+## Overlay — anatomy
 
 ```
- COMPACTO (padrão)                 EXPANDIDO (após clique)            RECOLHIDO
+ COMPACT (default)                 EXPANDED (after a click)           COLLAPSED
 
  ┌──────────────────────────┐     ┌──────────────────────────┐      ┌───┐
- │ ⋮ (◉ Ana      [AO VIVO]) │     │ ⋮ (◉ Ana      [AO VIVO]) │      │ ⋮ │
- │   (◉ Bruno       [mudo]) │     │   (◉ Bruno       [mudo]) │      │ 3 │ ← contagem
- │   (◎ Você              ) │     │   (◎ Você              ) │      │ ● │ ← pulso verde se
- │    +2                    │     │    +2                    │      └───┘   alguém fala
+ │ ⋮ (◉ Ana         [LIVE]) │     │ ⋮ (◉ Ana         [LIVE]) │      │ ⋮ │
+ │   (◉ Bruno      [muted]) │     │   (◉ Bruno      [muted]) │      │ 3 │ ← count
+ │   (◎ You               ) │     │   (◎ You               ) │      │ ● │ ← green pulse if
+ │    +2                    │     │    +2                    │      └───┘   someone speaks
  └──────────────────────────┘     ├──────────────────────────┤
-                                  │  mic  fone  tela  sair  ⚙ │ ← barra de controles
+                                  │  mic  head  scrn  leave ⚙│ ← control bar
                                   └──────────────────────────┘
-  ( … ) = pill arredondada por usuário
-  ◉ = avatar 32 px     ◎ = avatar com anel verde (falando)     ⋮ = alça para arrastar
+  ( … ) = rounded pill per user
+  ◉ = 32 px avatar     ◎ = avatar with green ring (speaking)     ⋮ = drag handle
 ```
 
-**Medidas (tamanho M) [Decisão]**
-- Pill de usuário: altura 40 px, `--radius-pill`, padding 4 px 12 px 4 px 4 px, avatar 32 px, nome 14 px semibold com `text-overflow: ellipsis` a partir de 140 px.
-- Espaço entre pills: 4 px. Container com `--overlay-bg` + `backdrop-filter: blur(var(--overlay-blur))` (validar suporte em janela transparente no Spike 1), `--radius-lg` e sombra suave.
-- Barra de controles: botões redondos de 36 px; o ativo/perigo usa `--status-red` de fundo (mudo, sair).
-- Modo "sem nomes": só os avatares, empilhados na vertical como pílula estreita, com o nome no hover.
+**Measurements (size M) [Decision]**
+- User pill: height 40 px, `--radius-pill`, padding 4 px 12 px 4 px 4 px, 32 px avatar, 14 px semibold name with `text-overflow: ellipsis` past 140 px.
+- Gap between pills: 4 px. Container with `--overlay-bg` + `backdrop-filter: blur(var(--overlay-blur))` (check support in a transparent window in Spike 1), `--radius-lg` and a soft shadow.
+- Control bar: 36 px round buttons; active/danger uses a `--status-red` background (muted, leave).
+- "No names" mode: avatars only, stacked vertically as a narrow pill, with the name on hover.
 
-**Comportamento**
-- Entra com fade e slide de 8 px (`--dur-normal`); a expansão anima a altura.
-- A área transparente fora do container é click-through.
-- Hover num participante mostra tooltip (nome + @usuario); clique direito abre o menu (volume, mutar localmente, assistir transmissão).
-- Selo "AO VIVO" é clicável e abre o viewer.
+**Behavior**
+- Enters with a fade and an 8 px slide (`--dur-normal`); expanding animates the height.
+- The transparent area outside the container is click-through.
+- Hovering a participant shows a tooltip (name + @user); right-click opens the menu (volume, mute locally, watch the stream).
+- The "LIVE" badge is clickable and opens the viewer.
 
-## Painel preso ao pill (substitui a janela principal)
+## Panel attached to the pill (replaces the main window)
 
-> A janela de 3 colunas no estilo Discord foi **descartada**: deixava o app com cara de genérico. O app é overlay-first. Princípios e regras em [09-estudo-overlay-opencluely](09-estudo-overlay-opencluely.md#4-direção-de-design-substitui-a-janela-genérica).
+> The Discord-style 3-column window was **dropped**: it made the app look generic. The app is overlay-first. Principles and rules in [09-overlay-study-opencluely](09-overlay-study-opencluely.md#4-design-direction-replaces-the-generic-window).
 
 ```
  ┌──────────────────────────────┐
- │ ⋮ (◉ Ana) (◉ Bruno) (◎ Você)  │  ← pill
+ │ ⋮ (◉ Ana) (◉ Bruno) (◎ You)  │  ← pill
  └──────────────────────────────┘
- ┌──────────────────────────────┐  ← painel: mesmo material, borda e raio do pill
- │  Canais   Controles   Você    │     abas compactas (texto 12–14 px)
+ ┌──────────────────────────────┐  ← panel: same material, border and radius as the pill
+ │  Channels  Controls  You     │     compact tabs (12–14 px text)
  │ ──────────────────────────── │
- │  🔊 Geral         ◉◉ 2        │  ← canal atual destacado
- │  🔊 Jogos         ◉ 1         │
- │  🔊 Estudo                    │
+ │  🔊 General       ◉◉ 2        │  ← current channel highlighted
+ │  🔊 Games         ◉ 1         │
+ │  🔊 Study                     │
  │ ──────────────────────────── │
- │  + Convidar                   │
+ │  + Invite                     │
  └──────────────────────────────┘
-   largura 280–320 px · altura pelo conteúdo · abre do lado com espaço
+   width 280–320 px · height from content · opens on the side with room
 ```
 
-Abas do painel: **Canais** (lista, entrar/sair, convidar), **Overlay** (modo fantasma, posição na tela, atalhos), **Você** (perfil, dispositivos, versão, sair do app). Os controles de chamada (mic, ensurdecer, compartilhar, sair) ficam no próprio pill, no estado expandido. Na primeira execução, o painel aparece centralizado com login/cadastro/convite.
+Panel tabs: **Channels** (list, join/leave, invite), **Overlay** (ghost mode, screen position, shortcuts), **You** (profile, devices, version, quit the app). Call controls (mic, deafen, share, leave) live in the pill itself, in the expanded state. On first run, the panel appears centered with login/sign-up/invite.
 
-## Seletor de tela
+> What shipped: tabs Channels, You, Appearance and Overlay; the panel is 360 px wide. See [10-next-steps](10-next-steps.md).
 
-Modal 720×520, abas **Telas | Aplicativos**, grade de `SourceCard` (miniatura 16:9, ícone do app e título truncado), rodapé com Qualidade (select), "Incluir áudio" (toggle) e os botões Cancelar / **Transmitir** (`--brand`).
+## Screen picker
+
+A 720×520 modal, tabs **Screens | Apps**, a grid of `SourceCard` (16:9 thumbnail, app icon and truncated title), and a footer with Quality (select), "Include audio" (toggle) and the Cancel / **Go live** (`--brand`) buttons.

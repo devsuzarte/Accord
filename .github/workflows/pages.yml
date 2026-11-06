@@ -1,7 +1,7 @@
-name: Página de convites
+name: Invite page
 
-# Publica a pasta site/ no GitHub Pages (grátis para repositório público).
-# Uma vez só: Settings → Pages → Source: "GitHub Actions".
+# Publishes the site/ folder to GitHub Pages (free for a public repository).
+# Once: Settings → Pages → Source: "GitHub Actions".
 on:
   push:
     branches: [main]

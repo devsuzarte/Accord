@@ -1,5 +1,5 @@
-# As actions ficam presas a um commit exato (mais seguro). O Dependabot abre um PR quando
-# sai versão nova, e o mantenedor revisa como qualquer outro PR.
+# Actions are pinned to an exact commit (safer). Dependabot opens a PR when a new version
+# comes out, and the maintainer reviews it like any other PR.
 version: 2
 updates:
   - package-ecosystem: github-actions

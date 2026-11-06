@@ -51,7 +51,7 @@ import type { SoundName } from './sounds'
 
 /**
  * Sessão da chamada. Vive no PILL porque ele fica aberto o tempo todo
- * (backgroundThrottling desligado) — docs/02-arquitetura.md › Renderer.
+ * (backgroundThrottling desligado) — docs/02-architecture.md › Renderer.
  */
 interface CallActions {
   join(name: string, serverUrl: string, password?: string | null): Promise<void>

@@ -1,29 +1,29 @@
-name: Algo não funciona
-description: Relate um problema no Accord (falha de segurança vai pelo SECURITY.md)
+name: Something doesn't work
+description: Report a problem in Accord (security issues go through SECURITY.md)
 labels: [bug]
 body:
   - type: textarea
     id: what
     attributes:
-      label: O que aconteceu
-      description: E o que você esperava que acontecesse.
+      label: What happened
+      description: And what you expected to happen.
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: Como reproduzir
+      label: How to reproduce
       placeholder: |
-        1. Hospedar um canal com senha
-        2. Um amigo entra pelo convite
+        1. Host a channel with a password
+        2. A friend joins through the invite
         3. ...
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: Versão do Accord
-      description: Aba Você › Atualizações, ou o nome do instalador.
+      label: Accord version
+      description: You tab › Updates, or the installer's file name.
       placeholder: 0.4.0
     validations:
       required: true
@@ -35,15 +35,15 @@ body:
   - type: dropdown
     id: network
     attributes:
-      label: Como vocês se conectam
+      label: How you connect
       options:
-        - Mesma rede
+        - Same network
         - Radmin VPN
         - Tailscale
-        - Outra VPN
-        - Não sei
+        - Another VPN
+        - Not sure
   - type: textarea
     id: logs
     attributes:
-      label: Registros
-      description: Se possível, anexe o main.log (pasta de logs do Accord). Apague senhas e IPs antes.
+      label: Logs
+      description: If you can, attach main.log (Accord's logs folder). Remove passwords and IPs first.

@@ -1,6 +1,6 @@
 /**
  * Tipos de domínio compartilhados entre API e desktop.
- * Espelham o modelo de dados de docs/02-arquitetura.md.
+ * Espelham o modelo de dados de docs/02-architecture.md.
  */
 
 export type Role = 'owner' | 'admin' | 'member'

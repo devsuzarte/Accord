@@ -1,20 +1,20 @@
-## O que muda
+## What changes
 
-<!-- Uma ou duas frases. Se resolve uma issue: "Resolve #123". -->
+<!-- One or two sentences. If it fixes an issue: "Fixes #123". -->
 
-## Por quê
+## Why
 
-<!-- O problema ou a necessidade. -->
+<!-- The problem or the need. -->
 
-## Como testei
+## How I tested it
 
-<!-- Passos que você seguiu. Prints ou vídeo se mexeu na interface. -->
+<!-- The steps you followed. Screenshots or a video if you touched the interface. -->
 
-## Conferido
+## Checklist
 
-- [ ] `bun run typecheck`, `bun run lint` e `bun run format` passam
-- [ ] Textos novos nos dois idiomas (`pt-BR.ts` e `en.ts`)
-- [ ] Sem cor fixa (só tokens) e sem nada do Discord
-- [ ] `docs/` atualizado se alguma decisão mudou
-- [ ] Mexe em segurança (API, tokens, IPC, permissões)? Expliquei o risco acima
-- [ ] Concordo que esta contribuição entra sob a Apache License 2.0
+- [ ] `bun run typecheck`, `bun run lint` and `bun run format` pass
+- [ ] New interface text in both languages (`pt-BR.ts` and `en.ts`)
+- [ ] No fixed colors (tokens only) and nothing from Discord
+- [ ] `docs/` updated if a decision changed
+- [ ] Touches security (API, tokens, IPC, permissions)? I explained the risk above
+- [ ] I agree this contribution is licensed under the Apache License 2.0

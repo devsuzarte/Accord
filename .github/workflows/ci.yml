@@ -1,4 +1,4 @@
-# Confere o código a cada envio: tipos, lint e formatação. Grátis em repositório público.
+# Checks the code on every push: types, lint and formatting. Free on a public repository.
 name: CI
 
 on:
@@ -17,11 +17,11 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.4
-      - name: Instalar dependências
+      - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Tipos
+      - name: Types
         run: bun run typecheck
       - name: Lint
         run: bun run lint
-      - name: Formatação
+      - name: Formatting
         run: bunx prettier --check .

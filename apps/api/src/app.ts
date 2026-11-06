@@ -13,7 +13,7 @@ import { isLoopback } from './services/roles'
 import { hostHeaderAllowed, isBanned } from './services/security'
 
 /**
- * Montagem da aplicação. Contas e vários canais entram no M3 (docs/10-proximos-passos.md).
+ * Montagem da aplicação. Contas e vários canais entram no M3 (docs/10-next-steps.md).
  *
  * CORS aberto: o app instalado chama a API a partir de file:// (origem "null") e de
  * outros PCs da rede. Não há cookies nem credenciais de navegador nesta API; o que dá poder

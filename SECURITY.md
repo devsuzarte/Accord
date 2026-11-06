@@ -1,28 +1,27 @@
-# Segurança
+# Security
 
-## Como relatar uma falha
+## Reporting a vulnerability
 
-**Não abra issue nem pull request público** para falha de segurança: isso expõe quem usa o app
-antes da correção.
+**Don't open a public issue or pull request** for a security issue: it exposes everyone using
+the app before the fix.
 
-Use o relatório privado do GitHub: na página do repositório, **Security → Report a
-vulnerability**. Se não conseguir, escreva para devsuzarte@gmail.com com o assunto
-"Segurança Accord".
+Use GitHub's private reporting: on the repository page, **Security → Report a vulnerability**.
+If you can't, write to devsuzarte@gmail.com with the subject "Accord security".
 
-Conte:
+Include:
 
-- o que dá para fazer (por exemplo: "alguém sem a senha entra no canal");
-- como reproduzir, passo a passo;
-- a versão do Accord e do Windows.
+- what can be done (for example: "someone without the password joins the channel");
+- how to reproduce it, step by step;
+- the Accord and Windows versions.
 
-Resposta em até 7 dias. Você recebe crédito na versão que corrigir, se quiser.
+You'll get a reply within 7 days. You're credited in the release that fixes it, if you want.
 
-## Versões que recebem correção
+## Supported versions
 
-Só a versão mais recente. A atualização automática leva a correção a todos.
+Only the latest version. Automatic updates deliver the fix to everyone.
 
-## O que já se sabe
+## Known issues
 
-Os riscos conhecidos e o que cada parte do sistema protege estão em
-[docs/14-seguranca.md](docs/14-seguranca.md). Um item que já está lá como "continua sendo risco"
-não precisa ser relatado de novo, mas ideias para resolver são bem-vindas numa issue.
+The known risks and what each part of the system protects are in
+[docs/14-security.md](docs/14-security.md). Something already listed there under "what remains
+a risk" doesn't need to be reported again, but ideas to solve it are welcome in an issue.

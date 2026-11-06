@@ -2,132 +2,137 @@
 
 <p align="center"><img src="apps/desktop/resources/icon.png" width="128" alt="Accord"></p>
 
-> App desktop de **voz + compartilhamento de tela** que roda como **overlay discreto** sobre o computador, com servidor **self-hosted pelo dono da sessão** e caminho de migração para nuvem. Inspiração visual e de fluxo: Discord (sem copiar marca, logo, fonte ou ícones proprietários).
+> A desktop app for **voice + screen sharing** that runs as a **discreet overlay** on top of your computer, with the server **self-hosted by whoever runs the session** and a migration path to the cloud. Visual and flow inspiration: Discord (without copying its brand, logo, font or proprietary icons).
 
-## Baixar (Windows 10/11)
+The app is available in English and Brazilian Portuguese.
 
-Baixe o **`Accord-Setup-<versão>.exe`** na página [Releases](https://github.com/devsuzarte/Accord/releases) e instale. O instalador já leva o servidor: quem for hospedar só clica em **Canais → Hospedar**; os outros vão em **Canais → Entrar**.
+## Download (Windows 10/11)
 
-- O instalador ainda **não é assinado**: o Windows pode mostrar "O Windows protegeu o computador". Clique em **Mais informações → Executar assim mesmo**.
-- Na primeira vez que hospedar, permita o **Firewall do Windows** em "Redes privadas".
-- Amigos fora da sua casa: todos no mesmo **Radmin VPN** (ou Tailscale).
+Download **`Accord-Setup-<version>.exe`** from the [Releases](https://github.com/devsuzarte/Accord/releases) page and install it. The installer already includes the server: whoever hosts just clicks **Channels → Host**; everyone else goes to **Channels → Join**.
 
-## Resumo das decisões
+- The installer is **not signed** yet: Windows may show "Windows protected your PC". Click **More info → Run anyway**.
+- The first time you host, allow **Windows Firewall** on "Private networks".
+- Friends outside your home: everyone on the same **Radmin VPN** (or Tailscale).
 
-| Tema | Decisão | Por quê |
+## Key decisions
+
+| Topic | Decision | Why |
 |---|---|---|
-| Shell desktop | **Electron** (MVP) | Captura de tela + áudio do sistema já vem pronta (`desktopCapturer` + `setDisplayMediaRequestHandler` com `audio: 'loopback'`). No Tauri, a captura via webview ainda tem problemas em aberto no macOS/Linux. Ver [02-arquitetura](docs/02-arquitetura.md#decisão-electron-vs-tauri) |
-| Mídia (SFU) | **LiveKit** self-hosted (binário único) | Roda local com `livekit-server --dev`; mesmo protocolo no LiveKit Cloud ou em cluster depois → migração sem reescrever cliente |
-| Backend | **Elysia + Bun** | Emissão de token LiveKit (entrada aberta); contas, canais e convites depois |
-| Banco | **SQLite + Drizzle** (MVP) → Postgres na nuvem | Zero infra no host; Drizzle troca o driver |
-| UI | **React + TypeScript + Vite** (electron-vite), CSS com design tokens | Altamente estilizável, tema estilo Discord |
+| Desktop shell | **Electron** (MVP) | Screen capture + system audio come ready (`desktopCapturer` + `setDisplayMediaRequestHandler` with `audio: 'loopback'`). In Tauri, webview capture still has open issues on macOS/Linux. See [02-architecture](docs/02-architecture.md#decision-electron-vs-tauri) |
+| Media (SFU) | Self-hosted **LiveKit** (single binary) | Runs locally with `livekit-server --dev`; same protocol on LiveKit Cloud or a cluster later → migration without rewriting the client |
+| Backend | **Elysia + Bun** | Issues LiveKit tokens (open join); accounts, channels and invites later |
+| Database | **SQLite + Drizzle** (MVP) → Postgres in the cloud | Zero infrastructure on the host; Drizzle swaps the driver |
+| UI | **React + TypeScript + Vite** (electron-vite), CSS with design tokens | Highly customizable, Discord-like theme |
 | Monorepo | **Turborepo + Bun workspaces** | `apps/desktop`, `apps/api`, `packages/ui`, `packages/shared` |
-| Plataforma MVP | **Windows 10 (2004+) / 11** | Overlay excluído da captura e áudio por processo dependem de APIs do Win10 2004+ |
+| MVP platform | **Windows 10 (2004+) / 11** | Overlay excluded from capture and per-process audio depend on Win10 2004+ APIs |
 
-## Como rodar (desenvolvimento)
+## Running it (development)
 
-Pré-requisitos: **Bun 1.4+** e **Git**. O `livekit-server.exe` já está em `infra/bin/`.
-
-```powershell
-bun install                # instala tudo e baixa o binário do Electron
-
-bun run livekit:dev        # terminal 1: servidor de voz (LiveKit)
-bun run dev                # terminal 2: servidor do Accord (porta 7870) + app
-bun run dev:second         # terminal 3 (opcional): segunda instância para testar sozinho
-```
-
-**Testar uma ligação:** defina seu nome (e a foto, se quiser) na aba **Você**. Em **Canais → Hospedar**, clique em **Hospedar agora** e depois em **Entrar no meu canal**. Na segunda instância, use outro nome e vá em **Canais → Entrar**: o canal aparece na lista.
-
-**Compartilhar tela:** no pill, clique em **Compartilhar tela**, escolha uma tela ou um aplicativo, a qualidade (até **1080p a 60 fps** em "Fluido") e se quer transmitir o som, e clique em **Transmitir**. Quem estiver na chamada abre a lista de pessoas (ícone de pessoas, ao lado de sair) e clica no selo **AO VIVO**.
-
-**Com outro PC na mesma rede (ou no Radmin/Tailscale):** o app procura sozinho os servidores na rede local, no Radmin VPN e nos PCs online do Tailscale. Se não aparecer, use **Adicionar endereço** com o IP (ou `IP:porta`, se não for a 7870). A aba **Guia** explica o passo a passo.
-
-## Como distribuir
+Requirements: **Bun 1.4+** and **Git**. `livekit-server.exe` is already in `infra/bin/`.
 
 ```powershell
-bun run package            # gera as duas coisas abaixo (rode no Windows)
+bun install                # installs everything and downloads the Electron binary
+
+bun run livekit:dev        # terminal 1: voice server (LiveKit)
+bun run dev                # terminal 2: Accord server (port 7870) + app
+bun run dev:second         # terminal 3 (optional): a second instance to test on your own
 ```
 
-| Saída | O que é |
-|---|---|
-| `release/accord-server/` | **Servidor**: `accord-server.exe` + `livekit-server.exe` + `LEIA-ME.txt`. Um duplo clique sobe tudo, com chaves próprias geradas na primeira vez, e a janela mostra os IPs para os amigos usarem |
-| `release/app/Accord-Setup-<versão>.exe` | **App**: instalador NSIS do Windows |
+**Test a call:** set your name (and photo, if you like) in the **You** tab. In **Channels → Host**, click **Host now** and then **Join my channel**. In the second instance, use another name and go to **Channels → Join**: the channel shows up in the list.
 
-Portas para liberar no firewall de quem hospeda: **7870/TCP** (servidor), **7871/UDP** (para o app achar o servidor na rede), **7880–7881/TCP** e **7882/UDP** (voz e vídeo). O instalador do app já leva o servidor junto (botão Hospedar).
+**Share your screen:** in the pill, click **Share screen**, pick a screen or an app, the quality (up to **1080p at 60 fps** with "Smooth") and whether to stream audio, then click **Go live**. People in the call open the people list (people icon, next to leave) and click the **LIVE** badge.
 
-| Comando (na raiz) | O que faz |
+**With another PC on the same network (or on Radmin/Tailscale):** the app looks for servers by itself on the local network, on Radmin VPN and on the Tailscale PCs that are online. If yours doesn't show up, use **Add address** with the IP (or `IP:port`, if it isn't 7870). The **Guide** tab walks through it.
+
+## Distributing
+
+```powershell
+bun run package            # builds both outputs below (run it on Windows)
+```
+
+| Output | What it is |
 |---|---|
-| `bun run dev` | servidor com watch + app com HMR |
-| `bun run dev:api` / `dev:desktop` | só um dos dois |
-| `bun run livekit:dev` | servidor de voz local (chaves de desenvolvimento) |
-| `bun run dev:second [perfil]` | outra instância do app com dados separados (precisa do `bun run dev` rodando) |
-| `bun run package:server` / `package:desktop` | só o servidor / só o instalador |
+| `release/accord-server/` | **Server**: `accord-server.exe` + `livekit-server.exe` + `LEIA-ME.txt`. A double click starts everything, with its own keys generated on first run, and the window shows the IPs for friends to use |
+| `release/app/Accord-Setup-<version>.exe` | **App**: Windows NSIS installer |
+
+Ports to allow in the host's firewall: **7870/TCP** (server), **7871/UDP** (so the app finds the server on the network), **7880–7881/TCP** and **7882/UDP** (voice and video). The app installer already includes the server (Host button).
+
+| Command (at the root) | What it does |
+|---|---|
+| `bun run dev` | server with watch + app with HMR |
+| `bun run dev:api` / `dev:desktop` | only one of the two |
+| `bun run livekit:dev` | local voice server (development keys) |
+| `bun run dev:second [profile]` | another app instance with separate data (needs `bun run dev` running) |
+| `bun run package:server` / `package:desktop` | only the server / only the installer |
 | `bun run typecheck` · `lint` · `format` | TypeScript · ESLint · Prettier |
 
-**Quando algo der errado:** no ícone da bandeja, **Ajuda → Copiar diagnóstico** (versões, sistema, memória e as últimas linhas do log) ou **Abrir pasta de logs** (`%APPDATA%\Accord\logs`).
+**When something goes wrong:** in the tray icon, **Help → Copy diagnostics** (versions, system, memory and the last log lines) or **Open logs folder** (`%APPDATA%\Accord\logs`).
 
-### Estrutura
+### Layout
 
 ```
-apps/desktop    Electron: main (overlay, compartilhamento, som nativo, viewer, atalhos, bandeja, logs),
-                preload (PlatformBridge), renderer (pill, panel, people, picker, viewer)
-apps/api        Elysia + Bun: /health, /join, /avatar, /moderate (dono e admins), LiveKit embutido no pacote do servidor
+apps/desktop    Electron: main (overlay, sharing, native audio, viewer, shortcuts, tray, logs),
+                preload (PlatformBridge), renderer (pill, panel, people, picker, chat, viewer, pointer)
+apps/api        Elysia + Bun: /health, /info, /join, /avatar, /me, /moderate, /pointer, /chat, /session;
+                LiveKit bundled in the server package
 packages/ui     tokens.css, global.css, surface.css, Avatar, IconButton, useReportSize
-packages/shared tipos, portas padrão, paletas, canais IPC, interface PlatformBridge
-packages/config tsconfigs compartilhados
+packages/shared types, default ports, palettes, IPC channels, PlatformBridge interface, i18n, invites, keys
+packages/config shared tsconfigs
 infra           livekit.yaml, livekit-dev.ts, bin/livekit-server.exe
 ```
 
-O que já existe:
-- **Overlay:** pill sempre no topo, do tamanho do conteúdo, não rouba foco, oculto da captura, arrastável pela lombada com encaixe nas bordas; painel preso ao pill; modo fantasma; bandeja; atalhos `Ctrl+Shift+O` (mostrar/ocultar) e `Ctrl+Shift+G` (fantasma).
-- **Voz:** entrar no canal "Geral" com seu nome e foto; anel de fala, mudo, ensurdecido; supressão de ruído com **RNNoise** (liga e desliga no Áudio); sons ao mutar, ensurdecer, entrar, sair e quando alguém chega.
-- **Pill:** só você e os controles, sempre visíveis (microfone, fone, tela, configurações, pessoas, sair). O botão de pessoas mostra quantos estão na chamada e um ponto vermelho quando alguém está ao vivo.
-- **Lista de pessoas:** janela ao lado do pill. Clique direito numa pessoa: **Mutar microfone / áudio (para mim)**; o **dono** (quem entra pelo PC do servidor) também muta **para todos** e promove a **admin**; dono e admins **desconectam**.
-- **Painel:** Canais (**Entrar** com a lista de canais encontrados e endereço manual, **Hospedar** pelo próprio app, **Guia**; seção Áudio recolhível), **Você** (nome, foto com recorte e zoom, GIF continua animado, e idioma), **Aparência** (6 paletas, 8 cores, imagem de fundo) e Overlay. Painel mais largo (360 px).
-- **Idiomas:** português e inglês, em todas as janelas, na bandeja e nas mensagens do servidor. Na primeira vez, segue o idioma do sistema.
-- **Tela:** seletor (telas/aplicativos, sem guias de navegador), 4 qualidades (até 1080p a 60 fps), selo AO VIVO, viewer sob demanda (conexão própria e invisível), som da transmissão capturado nativamente no Windows: tela inteira = tudo menos a chamada; aplicativo = só o som dele.
-- **Chat temporário:** botão no pill. Aberto: mensagens, imagens (clique para ampliar), arquivos e o campo com anexar/enviar (também arrastar e colar). Minimizado: as mensagens rolam perto do pill, como num chat de live (imagens viram "abra o chat para ver"); dá para desligar em Overlay. Fica só no servidor de quem hospeda e some quando a sessão acaba.
-- **Senha do canal:** quem hospeda define (ou troca com o canal aberto); os canais com senha aparecem com cadeado na lista.
-- **Troca de host:** se o PC de quem hospeda cair, a sessão passa para quem entrou primeiro, que abre o próprio servidor com a cópia da sessão (senha, chat, anexos, silêncios); os outros reconectam no IP dele sozinhos.
-- **Volume por pessoa:** 0% a 200%, só para você, no clique direito da lista de pessoas.
-- **Segurança revisada** ([14](docs/14-seguranca.md)): ninguém se passa pelo dono nem assiste escondido, convite sem a senha, limite de tentativas, desconectar bloqueia por 15 minutos, sem programas pelo chat.
-- **Aperte para falar** e atalhos de mutar/ensurdecer que funcionam com o jogo em foco (inclusive botões laterais do mouse).
-- **Apontar na tela de quem transmite** e **miniatura da transmissão sobre o jogo**.
-- **Convites por link:** "Copiar convite" gera um link que abre o Accord direto no canal (com a senha, se tiver). Funciona clicado no WhatsApp ou no Discord.
-- **Qualidade no viewer:** selo com resolução e fps, painel com taxa, perda, atraso e travadas, diagnóstico de onde está o gargalo e opção Econômica (360p).
-- **Entrega:** pacote do servidor de um clique, instalador, **atualização automática** pelo GitHub Releases, publicada sozinha pelo GitHub Actions ao criar uma tag ([12](docs/12-publicar-versao.md)), logs e diagnóstico.
+What already works:
+- **Overlay:** pill always on top, sized to its content, never steals focus, hidden from capture, draggable by its spine with edge snapping; panel attached to the pill; ghost mode; tray; shortcuts `Ctrl+Shift+O` (show/hide) and `Ctrl+Shift+G` (ghost).
+- **Voice:** join the "General" channel with your name and photo; speaking ring, mute, deafen; noise suppression with **RNNoise** (toggle in Audio); sounds for mute, deafen, join, leave and when someone arrives.
+- **Pill:** just you and the controls, always visible (mic, headphones, screen, settings, people, leave). The people button shows how many are in the call and a red dot when someone is live.
+- **People list:** a window next to the pill. Right-click a person: **Mute mic / audio (for me)**; the **owner** (whoever joins from the server PC) can also mute **for everyone** and promote to **admin**; owner and admins can **disconnect** people.
+- **Panel:** Channels (**Join** with the list of channels found and a manual address, **Host** from the app itself, **Guide**; collapsible Audio section), **You** (name, photo with crop and zoom, animated GIFs stay animated, and language), **Appearance** (6 palettes, 8 colors, background image) and Overlay.
+- **Languages:** Portuguese and English, in every window, the tray and server messages. On first run it follows the system language.
+- **Screen:** picker (screens/apps, no browser tabs), 4 quality presets (up to 1080p at 60 fps), LIVE badge, on-demand viewer (its own hidden connection), stream audio captured natively on Windows: entire screen = everything except the call; app = only that app's audio.
+- **Temporary chat:** a button on the pill. Open: messages, images (click to enlarge), files and the input with attach/send (drag and paste work too). Minimized: messages scroll near the pill, like a livestream chat (images become "open the chat to see"); can be turned off in Overlay. It lives only on the host's server and disappears when the session ends.
+- **Channel password:** the host sets it (or changes it with the channel open); locked channels show a padlock in the list.
+- **Host migration:** if the host's PC drops, the session moves to whoever joined first, who opens their own server with the session copy (password, chat, attachments, mutes); everyone else reconnects to their IP automatically. Stopping hosting asks whether to **end for everyone** or **hand the host over**.
+- **Per-person volume:** 0% to 200%, just for you, from the right-click menu in the people list.
+- **Security review** ([14](docs/14-security.md)): nobody can pose as the owner or watch hidden, invites never carry the password, attempt limits, disconnecting blocks for 15 minutes, no programs through chat.
+- **Push to talk** and mute/deafen shortcuts that work with a game in focus (side mouse buttons included).
+- **Point at the streamer's screen** and a **mini stream over your game**.
+- **Invite links:** "Copy invite" creates a link that opens Accord straight in the channel (with an invite key, never the password). Works when clicked in WhatsApp or Discord.
+- **Quality in the viewer:** badge with resolution and fps, a panel with bitrate, loss, delay and freezes, a diagnosis of where the bottleneck is, and a Data saver option (360p).
+- **Delivery:** one-click server package, installer, **automatic updates** through GitHub Releases, published by GitHub Actions ([12](docs/12-publishing-a-release.md)), logs and diagnostics.
 
-Fora por enquanto: contas e vários canais (M3) e o assistente de conexão (M4). Ideias para os próximos passos: [13](docs/13-ideias.md). Para revisar o visual com **participantes de exemplo**, crie `apps/desktop/.env.development.local` com `VITE_OVERLAY_DEMO=1`.
+Not yet: accounts and multiple channels (M3) and the connection assistant (M4). Ideas for what comes next: [13](docs/13-ideas.md). To review the visuals with **sample participants**, create `apps/desktop/.env.development.local` with `VITE_OVERLAY_DEMO=1`.
 
-## Documentos
+## Documents
 
-1. [Visão do produto e escopo](docs/01-visao-produto.md) — problema, personas, user stories, dentro/fora do MVP
-2. [Arquitetura](docs/02-arquitetura.md) — Electron vs Tauri, componentes, fluxos, modelo de dados, API, host mode
-3. [Funcionalidades e critérios de aceite](docs/03-funcionalidades.md) — especificação de cada feature
-4. [Design system e overlay](docs/04-design-system.md) — paleta, tokens, pill, estados, ícones, wireframes
-5. [Roadmap](docs/05-roadmap.md) — spikes, fases, tarefas, definição de pronto
-6. [Riscos e mitigações](docs/06-riscos.md)
-7. [Pesquisa com usuários](docs/07-pesquisa-usuarios.md) — plano, roteiro de entrevista, teste de usabilidade do overlay
-8. [Referências](docs/08-referencias.md) — fontes verificadas
-9. [Estudo do overlay (OpenCluely)](docs/09-estudo-overlay-opencluely.md) — técnicas de janela, o que levamos/adaptamos/descartamos, arquitetura overlay-first e direção de design
-10. [Próximos passos](docs/10-proximos-passos.md) — marcos M1–M9 até o app funcionando
-11. [Pesquisa: supressão de ruído e login com Discord](docs/11-pesquisa-ruido-e-discord.md) — opções avaliadas e recomendação
-12. [Publicar uma versão](docs/12-publicar-versao.md) — passo a passo da release e da atualização automática
+1. [Product vision and scope](docs/01-product-vision.md) — problem, personas, user stories, in/out of the MVP
+2. [Architecture](docs/02-architecture.md) — Electron vs Tauri, components, flows, data model, API, host mode
+3. [Features and acceptance criteria](docs/03-features.md) — spec for each feature
+4. [Design system and overlay](docs/04-design-system.md) — palette, tokens, pill, states, icons, wireframes
+5. [Roadmap](docs/05-roadmap.md) — spikes, phases, tasks, definition of done
+6. [Risks and mitigations](docs/06-risks.md)
+7. [User research](docs/07-user-research.md) — plan, interview script, overlay usability test
+8. [References](docs/08-references.md) — verified sources
+9. [Overlay study (OpenCluely)](docs/09-overlay-study-opencluely.md) — window techniques, what we took/adapted/dropped, overlay-first architecture and design direction
+10. [Next steps](docs/10-next-steps.md) — milestones M1–M11 up to a working app
+11. [Research: noise suppression and Discord login](docs/11-noise-and-discord-research.md) — options evaluated and recommendation
+12. [Publishing a release](docs/12-publishing-a-release.md) — release and automatic update, step by step
+13. [Ideas](docs/13-ideas.md) — what could make Accord different, without paid services
+14. [Security](docs/14-security.md) — who could attack whom, what is fixed and what remains a risk
 
-## Legenda usada nos documentos
+## Legend used in the documents
 
-- **[Verificado]**: confirmado em documentação oficial (link em [08-referencias](docs/08-referencias.md))
-- **[Hipótese]**: provável, mas precisa ser validado num spike antes de virar código de produção
-- **[Decisão]**: escolha de projeto, pode ser revista
+- **[Verified]**: confirmed in official documentation (link in [08-references](docs/08-references.md))
+- **[Hypothesis]**: likely, but needs to be validated in a spike before it becomes production code
+- **[Decision]**: a project choice that can be revisited
 
-## Próximo passo
+## Next step
 
-Testar no Windows (voz, tela com som, instalador e servidor) e seguir a lista de validação em [10-proximos-passos](docs/10-proximos-passos.md#validação-no-windows-o-que-só-dá-para-confirmar-aí).
+Test on Windows (voice, screen with audio, installer and server) and follow the validation list in [10-next-steps](docs/10-next-steps.md#validation-on-windows-what-can-only-be-confirmed-there).
 
-## Contribuir
+## Contributing
 
-Contribuições são bem-vindas. Leia o [CONTRIBUTING.md](CONTRIBUTING.md) antes de abrir um pull request: ele explica como propor uma mudança, o que é conferido e como a revisão funciona. Falhas de segurança vão por um canal privado ([SECURITY.md](SECURITY.md)), nunca em issue pública. Todos seguem o [código de conduta](CODE_OF_CONDUCT.md).
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request: it explains how to propose a change, what gets checked and how review works. Security issues go through a private channel ([SECURITY.md](SECURITY.md)), never a public issue. Everyone follows the [code of conduct](CODE_OF_CONDUCT.md).
 
-## Licença
+## License
 
-[Apache License 2.0](LICENSE) — veja também o [NOTICE](NOTICE). Ao enviar uma contribuição, você concorda que ela entra sob a mesma licença (seção 5 da Apache 2.0). O instalador também leva programas de terceiros (LiveKit, Electron, RNNoise e outros), cada um com a sua licença: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[Apache License 2.0](LICENSE) — see also [NOTICE](NOTICE). By submitting a contribution, you agree it is licensed under the same terms (section 5 of Apache 2.0). The installer also ships third-party software (LiveKit, Electron, RNNoise and others), each under its own license: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

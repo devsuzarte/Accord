@@ -8,7 +8,7 @@ import type { AudioProcessorOptions, Track, TrackProcessor } from 'livekit-clien
 /**
  * Supressão de ruído com RNNoise (rede neural pequena da Xiph, licença BSD) rodando em
  * WebAssembly num AudioWorklet — tira teclado, ventilador e barulho de fundo da sua voz.
- * Comparativo e motivos: docs/11-pesquisa-ruido-e-discord.md.
+ * Comparativo e motivos: docs/11-noise-and-discord-research.md.
  *
  * O RNNoise trabalha a 48 kHz: o microfone passa por um AudioContext nosso nessa taxa.
  */

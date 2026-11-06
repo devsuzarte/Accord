@@ -4,7 +4,7 @@ import type { BrowserWindow, BrowserWindowConstructorOptions, WebPreferences } f
 
 export type Page = 'pill' | 'panel' | 'picker' | 'people' | 'chat' | 'viewer' | 'pointer'
 
-/** Preferências de segurança obrigatórias (docs/02-arquitetura.md › Segurança Electron). */
+/** Preferências de segurança obrigatórias (docs/02-architecture.md › Segurança Electron). */
 export function secureWebPreferences(extra: WebPreferences = {}): WebPreferences {
   return {
     preload: join(__dirname, '../preload/index.js'),
@@ -18,7 +18,7 @@ export function secureWebPreferences(extra: WebPreferences = {}): WebPreferences
 
 /**
  * Base das superfícies do overlay (pill e painel).
- * Estudo: docs/09-estudo-overlay-opencluely.md §1.2 — janela que "não parece janela".
+ * Estudo: docs/09-overlay-study-opencluely.md §1.2 — janela que "não parece janela".
  */
 export const overlaySurfaceOptions: BrowserWindowConstructorOptions = {
   show: false,

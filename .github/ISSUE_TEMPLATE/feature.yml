@@ -1,23 +1,23 @@
-name: Ideia ou feature
-description: Proponha algo novo (abra antes de mandar um PR grande)
-labels: [ideia]
+name: Idea or feature
+description: Propose something new (open this before sending a big PR)
+labels: [enhancement]
 body:
   - type: textarea
     id: problem
     attributes:
-      label: Que problema resolve
-      description: A situação real em que você sente falta disso.
+      label: What problem does it solve
+      description: The real situation where you miss it.
     validations:
       required: true
   - type: textarea
     id: idea
     attributes:
-      label: Como você imagina
+      label: How you picture it
     validations:
       required: true
   - type: checkboxes
     id: help
     attributes:
-      label: Contribuição
+      label: Contributing
       options:
-        - label: Quero fazer o pull request disto
+        - label: I want to send the pull request for this

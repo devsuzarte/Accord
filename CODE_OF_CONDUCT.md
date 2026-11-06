@@ -1,24 +1,25 @@
-# Código de conduta
+# Code of conduct
 
-O Accord é feito por gente que gosta de jogar e conversar com os amigos. O espaço do projeto
-(issues, pull requests, discussões) deve ser bom para qualquer pessoa participar.
+Accord is made by people who like playing games and talking with their friends. The project's
+spaces (issues, pull requests, discussions) should be a good place for anyone to take part.
 
-## O que esperamos
+## What we expect
 
-- Tratar todo mundo com respeito, inclusive quando discorda.
-- Criticar o código e a ideia, nunca a pessoa.
-- Ter paciência com quem está começando.
-- Aceitar a decisão do mantenedor sobre o rumo do projeto, mesmo quando não é a sua preferida.
+- Treat everyone with respect, including when you disagree.
+- Criticize the code and the idea, never the person.
+- Be patient with people who are just starting.
+- Accept the maintainer's decision about the project's direction, even when it isn't your
+  favorite.
 
-## O que não aceitamos
+## What we don't accept
 
-- Ofensas, assédio, ameaças ou piadas sobre gênero, raça, religião, orientação, deficiência,
-  aparência ou origem de alguém.
-- Expor dados de outra pessoa (endereço, IP, contatos) sem permissão.
-- Spam, autopromoção fora de contexto ou insistir num assunto depois de um "não".
+- Insults, harassment, threats, or jokes about anyone's gender, race, religion, orientation,
+  disability, appearance or origin.
+- Exposing someone else's data (address, IP, contacts) without permission.
+- Spam, off-topic self-promotion, or pushing a topic after a "no".
 
-## O que acontece
+## What happens
 
-O mantenedor pode editar ou apagar comentários, fechar issues e PRs e bloquear quem não seguir
-estas regras, começando por um aviso quando fizer sentido. Para relatar um problema de
-conduta em particular, escreva para devsuzarte@gmail.com.
+The maintainer may edit or delete comments, close issues and PRs, and block anyone who doesn't
+follow these rules, starting with a warning when that makes sense. To report a conduct problem
+privately, write to devsuzarte@gmail.com.

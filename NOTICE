@@ -1,10 +1,7 @@
 Accord
-Copyright 2026 Benjamin Suzarte (devsuzarte) e contribuidores do Accord
+Copyright 2026 Benjamin Suzarte (devsuzarte) and the Accord contributors
 
-Este produto é distribuído sob a Apache License, Version 2.0 (veja LICENSE).
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
-O instalador e o pacote do servidor incluem programas de terceiros, cada um com a
-sua licença; a lista está em THIRD_PARTY_NOTICES.md.
 The installer and the server package include third-party software under their own
 licenses; see THIRD_PARTY_NOTICES.md.

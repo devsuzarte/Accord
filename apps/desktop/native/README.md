@@ -1,5 +1,5 @@
 # native/
 
-Reservado para o addon de **áudio por processo** (WASAPI process loopback, Windows 10 2004+).
+Reserved for a **per-process audio** addon (WASAPI process loopback, Windows 10 2004+).
 
-Ainda vazio: o caminho (usar/forkar `loopback-capture` ou escrever com napi-rs) é decidido no **Spike S3**. Ver `docs/02-arquitetura.md` › Compartilhamento de tela e `docs/05-roadmap.md` › Fase 0.
+Still empty: stream audio currently uses `loopback-capture` + `koffi` (`src/main/share/native-audio.ts`). Whether to fork it or write our own with napi-rs is tracked in `docs/02-architecture.md` › Screen sharing and `docs/05-roadmap.md` › Phase 0.

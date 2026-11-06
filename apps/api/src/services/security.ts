@@ -3,7 +3,7 @@ import { HOST_KEY_HEADER } from '@sharescreen/shared'
 import { isLoopback } from './roles'
 
 /**
- * Defesas da API (ver docs/14-seguranca.md): limite de tentativas, banimento de quem foi
+ * Defesas da API (ver docs/14-security.md): limite de tentativas, banimento de quem foi
  * desconectado, tokens revogados e a chave do app de quem hospeda.
  */
 

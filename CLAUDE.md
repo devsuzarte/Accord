@@ -1,64 +1,64 @@
-# Accord (antes "sharescreen"): contexto para o Claude Code
+# Accord (formerly "sharescreen"): context for Claude Code
 
-App desktop de voz + compartilhamento de tela em overlay, inspirado no Discord. Plano completo em `README.md` e `docs/`.
+Desktop app for voice + screen sharing as an overlay, inspired by Discord. Full plan in `README.md` and `docs/`.
 
-## Decisões fixas
-- Electron (MVP), React + TS + electron-vite; Windows 10 2004+/11 primeiro
-- LiveKit (SFU) self-hosted; API Elysia + Bun; SQLite + Drizzle
+## Fixed decisions
+- Electron (MVP), React + TS + electron-vite; Windows 10 2004+/11 first
+- Self-hosted LiveKit (SFU); Elysia + Bun API; SQLite + Drizzle
 - Turborepo + Bun workspaces: `apps/desktop`, `apps/api`, `packages/ui`, `packages/shared`, `packages/config`
-- UI e lógica de chamada não importam nada do Electron; todo acesso ao SO passa pelo `PlatformBridge` (preload)
-- Segurança Electron: contextIsolation + sandbox + IPC em allowlist e payload validado
-- Ícones Lucide, fonte Noto Sans, tokens em `packages/ui/tokens.css`; nunca usar marca, fonte, ícones ou sons do Discord
-- Seletor de tela só com `screen` e `window` (sem guias de navegador)
-- **Overlay-first**: sem janela principal. Superfícies = pill (não focável, tamanho do conteúdo, topo `screen-saver`, `setContentProtection`) + painel preso ao pill + seletor e viewer sob demanda. Ver `docs/09-estudo-overlay-opencluely.md`
-- OpenCluely é só referência de estudo: não copiar código nem funcionalidades; nada de disfarce de processo
+- UI and call logic import nothing from Electron; all OS access goes through the `PlatformBridge` (preload)
+- Electron security: contextIsolation + sandbox + allowlisted IPC with validated payloads
+- Lucide icons, Noto Sans font, tokens in `packages/ui/tokens.css`; never use Discord's brand, font, icons or sounds
+- Screen picker only offers `screen` and `window` (no browser tabs)
+- **Overlay-first**: no main window. Surfaces = pill (non-focusable, sized to content, `screen-saver` level, `setContentProtection`) + panel attached to the pill + picker and viewer on demand. See `docs/09-overlay-study-opencluely.md`
+- OpenCluely is only a study reference: don't copy code or features; no process disguising
 
-## Comandos
+## Commands
 - `bun run dev` (API + desktop), `bun run typecheck`, `bun run lint`, `bun run format`, `bun run build`
-- Migrations: editar `apps/api/src/db/schema.ts` → `bun run --cwd apps/api db:generate` → `db:migrate`
-- Canal IPC novo: `packages/shared/src/ipc.ts` → `PlatformBridge` → `apps/desktop/src/preload` → `apps/desktop/src/main/ipc.ts`
-- Pacotes do workspace são TS-fonte; no electron-vite eles ficam em `externalizeDeps.exclude`
-- Overlay: `apps/desktop/src/main/overlay/overlay-manager.ts`. As superfícies medem o próprio conteúdo com `useReportSize` (ResizeObserver) e o main ajusta a janela. Movimentos feitos por código são marcados em `expectedPosition` para não serem tratados como arrasto
-- Participantes de exemplo do pill: `src/renderer/shared/demo.ts` (só em dev, com `VITE_OVERLAY_DEMO=1`)
-- Chamada: a `Room` do LiveKit vive no pill (`src/renderer/pill/call/callStore.ts`, Zustand). O painel manda `CallCommand` → main → pill; o pill publica `CallSnapshot` → main → painel
-- Entrada aberta: `POST /join { name, viewer? }` (sala `geral`; `viewer: true` = token oculto e só-assistir). `OPEN_JOIN=false` desliga. Contas (M3) adiadas
-- Porta padrão da API: 7870 (`packages/shared/src/defaults.ts`, `normalizeServerUrl` completa a porta)
-- Compartilhamento: `src/main/share/` (seletor, `setDisplayMediaRequestHandler`, som nativo via loopback-capture + koffi, viewers). Pill recebe só vozes (`autoSubscribe: false`); o viewer tem conexão própria
-- Som da transmissão: main → MessagePort (repassado pelo preload via `window.postMessage`) → `pcm-player.worklet.js` (importar com `?url&no-inline`: a CSP bloqueia data:)
-- Testes sem Windows: `SHARESCREEN_FAKE_SHARE_AUDIO=1` (tom de 440 Hz no lugar do som nativo, só em dev)
-- Pacotes: `bun run package:server` (API compilada sobe o LiveKit vizinho com chaves geradas) e `package:desktop` (NSIS). Logs em `app.getPath('logs')`
-- Testar chamada sozinho: `bun run livekit:dev` + `bun run dev` + `bun run dev:second` (perfil separado via `--profile=`)
-- Renderer com dependências só em devDependencies (o Vite empacota); `dependencies` do desktop = só módulos nativos do main
-- Papéis: dono = quem entra pelo PC do servidor (loopback); admin = promovido pelo dono. Autorização só no servidor (`apps/api/src/services/roles.ts`); atributos do LiveKit (`role`, `avatar`, `serverMic`, `serverAudio`) são só para a interface
-- Moderação: `POST /moderate` com o token da chamada no `Authorization: Bearer`. "Mutar para mim" é local, pelo nome (`src/renderer/shared/localMutes.ts`)
-- Lista de pessoas: janela `people` (`src/main/overlay/people-window.ts`), recebe o `CallSnapshot` e manda `CallCommand` como o painel
-- Perfil e tema: `src/main/settings/settings-store.ts` (profile.json, theme.json em userData) → `ProfileChanged`/`ThemeChanged` para todas as janelas. Toda página chama `startTheme()`; cores novas no CSS = tokens/`color-mix`, nunca hex fixo
-- Idiomas: textos novos SEMPRE nos dois dicionários (`packages/shared/src/i18n/pt-BR.ts` e `en.ts`, mesmas chaves); no renderer `useT()`, fora do React `translateNow()`; no main `src/main/i18n.ts`. Erros da API voltam como código, não frase
-- Hospedar e descoberta: `src/main/network/` (HostService, DiscoveryService). Porta de descoberta 7871/UDP (`DEFAULT_DISCOVERY_PORT`); o servidor confirma com `GET /info`
-- RNNoise: `pill/call/noise.ts` (wasm e worklet com `?url&no-inline`; CSP do pill tem `'wasm-unsafe-eval'`). Sons: `pill/call/sounds.ts` (WebAudio, sem arquivos)
+- Migrations: edit `apps/api/src/db/schema.ts` → `bun run --cwd apps/api db:generate` → `db:migrate`
+- New IPC channel: `packages/shared/src/ipc.ts` → `PlatformBridge` → `apps/desktop/src/preload` → `apps/desktop/src/main/ipc.ts`
+- Workspace packages are TS source; in electron-vite they go in `externalizeDeps.exclude`
+- Overlay: `apps/desktop/src/main/overlay/overlay-manager.ts`. Surfaces measure their own content with `useReportSize` (ResizeObserver) and main resizes the window. Moves made by code are marked in `expectedPosition` so they aren't treated as drags
+- Sample pill participants: `src/renderer/shared/demo.ts` (dev only, with `VITE_OVERLAY_DEMO=1`)
+- Call: the LiveKit `Room` lives in the pill (`src/renderer/pill/call/callStore.ts`, Zustand). The panel sends a `CallCommand` → main → pill; the pill publishes a `CallSnapshot` → main → panel
+- Open join: `POST /join { name, viewer? }` (room `geral`; `viewer: true` = hidden watch-only token, only for someone already in the call). `OPEN_JOIN=false` turns it off. Accounts (M3) postponed
+- Default API port: 7870 (`packages/shared/src/defaults.ts`; `normalizeServerUrl` adds the port)
+- Sharing: `src/main/share/` (picker, `setDisplayMediaRequestHandler`, native audio via loopback-capture + koffi, viewers). The pill receives voices only (`autoSubscribe: false`); the viewer has its own connection
+- Stream audio: main → MessagePort (forwarded by the preload via `window.postMessage`) → `pcm-player.worklet.js` (import with `?url&no-inline`: the CSP blocks data:)
+- Testing without Windows: `SHARESCREEN_FAKE_SHARE_AUDIO=1` (440 Hz tone instead of native audio, dev only)
+- Packages: `bun run package:server` (the compiled API starts the neighboring LiveKit with generated keys) and `package:desktop` (NSIS). Logs in `app.getPath('logs')`
+- Testing a call on your own: `bun run livekit:dev` + `bun run dev` + `bun run dev:second` (separate profile via `--profile=`)
+- Renderer dependencies only in devDependencies (Vite bundles them); desktop `dependencies` = only main's native modules
+- Roles: owner = whoever joins from the server PC (through the host app, see Security); admin = promoted by the owner. Authorization only on the server (`apps/api/src/services/roles.ts`); LiveKit attributes (`role`, `avatar`, `serverMic`, `serverAudio`) are only for the UI
+- Moderation: `POST /moderate` with the call token in `Authorization: Bearer`. "Mute for me" is local, by name (`src/renderer/shared/localMutes.ts`)
+- People list: `people` window (`src/main/overlay/people-window.ts`), receives the `CallSnapshot` and sends `CallCommand` like the panel
+- Profile and theme: `src/main/settings/settings-store.ts` (profile.json, theme.json in userData) → `ProfileChanged`/`ThemeChanged` to every window. Every page calls `startTheme()`; new CSS colors = tokens/`color-mix`, never fixed hex
+- Languages: new UI text ALWAYS in both dictionaries (`packages/shared/src/i18n/pt-BR.ts` and `en.ts`, same keys); in the renderer `useT()`, outside React `translateNow()`; in main `src/main/i18n.ts`. API errors come back as codes, not sentences
+- Hosting and discovery: `src/main/network/` (HostService, DiscoveryService). Discovery port 7871/UDP (`DEFAULT_DISCOVERY_PORT`); the server confirms with `GET /info`
+- RNNoise: `pill/call/noise.ts` (wasm and worklet with `?url&no-inline`; the pill CSP has `'wasm-unsafe-eval'`). Sounds: `pill/call/sounds.ts` (WebAudio, no files)
 
-- Nome do produto: **Accord** (instalador, janelas, bandeja, textos). Os pacotes internos continuam `@sharescreen/*`, e as chaves de localStorage e o protocolo de descoberta mantêm o prefixo `sharescreen`
-- Ícones: `apps/desktop/resources/` (`logo.svg` original, `icon.png`/`icon.ico` do app, `tray.png`/`tray@2x.png`)
-- Build do Windows a partir do Linux funciona com wine + wine32 (o NSIS roda o desinstalador no wine) e o `@koromix/koffi-win32-x64` presente em node_modules
+- Product name: **Accord** (installer, windows, tray, text). Internal packages stay `@sharescreen/*`, and localStorage keys and the discovery protocol keep the `sharescreen` prefix
+- Icons: `apps/desktop/resources/` (original `logo.svg`, app `icon.png`/`icon.ico`, `tray.png`/`tray@2x.png`)
+- Building for Windows from Linux works with wine + wine32 (NSIS runs the uninstaller under wine) and `@koromix/koffi-win32-x64` present in node_modules
 
-- Senha do canal: cabeçalho `x-accord-password` (`PASSWORD_HEADER`); a senha vive em `apps/api/src/services/session.ts` (env `SHARESCREEN_PASSWORD` ao abrir; `POST /session/password` só do app de quem hospeda, com a chave do app)
-- Chat: servidor guarda em memória + pasta temporária (`routes/session.ts`) e avisa pela sala (`sendData`, tópico `accord.chat`); o pill guarda as mensagens (`pill/call/chat.ts`) e publica `ChatState` → main (`overlay/chat-window.ts`) → janela `chat` (modos `expanded`/`mini`). A janela de chat envia direto ao servidor com o token
-- Troca de host: `pill/call/migration.ts` (fila por `joinedAt`, atributo `addrs`), `main/network/session-mirror.ts` (cópia a cada 10 s em userData/sessao-copia) e `HostService.start({ restore: true })` → env `SHARESCREEN_RESTORE`
-- Vozes tocam pelo WebAudio (`webAudioMix`): volume, ensurdecer e "mutar para mim" são `participant.setVolume`, nunca `<audio>.muted`
-- Atualização automática: `src/main/updater.ts` (electron-updater, GitHub). Publicar: `docs/12-publicar-versao.md`
-- Convites: `packages/shared/src/invite.ts` (`accord://join?h=&n=&k=` com a chave de convite, nunca a senha; e a página `site/convite/` no GitHub Pages, que só repassa). Main: `src/main/invites.ts` (protocolo, `second-instance`) → `InviteReceived` → `panel/InviteCard.tsx`. `CallSnapshot.server` dá URL/nome/chave da chamada atual
-- Qualidade no viewer: `renderer/viewer/quality.ts` (`getRTCStatsReport` a cada 1 s + `connectionQuality` de quem transmite); Econômica = `setVideoQuality(LOW)` (camada de 360p do simulcast)
-- CI e release: `.github/workflows/` (`ci.yml`; `release.yml` publica ao empurrar tag `v*` igual à versão do desktop; `pages.yml` publica `site/`)
-- Segurança (docs/14): token sem `canUpdateOwnMetadata`/`canPublishData`; nome/foto/addrs via `POST /me`; dono e rotas do host exigem `SHARESCREEN_HOST_KEY` (o main injeta `x-accord-host-key` nos pedidos do app a 127.0.0.1); senha só como hash; convite = `invite:<chave>` no cabeçalho da senha; `services/security.ts` (limites, banimento, Host)
-- Fim da sessão: `HostService.stop('end' | 'handoff')` → `POST /session/end`; avisos da sala no tópico `accord.session` (`ended`, `handoff`, `invite-rotated`)
-- Atalhos de voz: `main/hotkeys.ts` (GetAsyncKeyState no Windows, globalShortcut fora), hotkeys.json em userData; PTT = `track.enabled` no pill. Testes: `SHARESCREEN_FAKE_HOLD=1` deixa ligar o modo e o atalho vem por `CallCommand { type: 'ptt' }`
-- Apontar: viewer → `POST /pointer` → tópico `accord.pointer` → pill (se transmitindo) → `PointerWindow` (página `pointer`) + `Pings` no viewer
-- Miniatura: `ViewerManager.toggleMini` troca a janela (sem moldura, `focusable: false`, content protection); travar = `setIgnoreMouseEvents`
-- Windows: `disable-features=CalculateNativeWinOcclusion` evita janelas do overlay "congeladas" depois de bloqueio/inatividade
+- Channel password: header `x-accord-password` (`PASSWORD_HEADER`); the password lives in `apps/api/src/services/session.ts` (env `SHARESCREEN_PASSWORD` on start; `POST /session/password` only from the host's app, with the host key)
+- Chat: the server keeps it in memory + a temp folder (`routes/session.ts`) and announces through the room (`sendData`, topic `accord.chat`); the pill stores messages (`pill/call/chat.ts`) and publishes `ChatState` → main (`overlay/chat-window.ts`) → `chat` window (`expanded`/`mini` modes). The chat window posts straight to the server with the token
+- Host migration: `pill/call/migration.ts` (queue by `joinedAt`, `addrs` attribute), `main/network/session-mirror.ts` (copy every 10 s in userData/sessao-copia) and `HostService.start({ restore: true })` → env `SHARESCREEN_RESTORE`
+- Voices play through WebAudio (`webAudioMix`): volume, deafen and "mute for me" use `participant.setVolume`, never `<audio>.muted`
+- Automatic updates: `src/main/updater.ts` (electron-updater, GitHub). Publishing: `docs/12-publishing-a-release.md`
+- Invites: `packages/shared/src/invite.ts` (`accord://join?h=&n=&k=` with the invite key, never the password; and the `site/convite/` page on GitHub Pages, which only forwards). Main: `src/main/invites.ts` (protocol, `second-instance`) → `InviteReceived` → `panel/InviteCard.tsx`. `CallSnapshot.server` gives the URL/name/key of the current call
+- Quality in the viewer: `renderer/viewer/quality.ts` (`getRTCStatsReport` every 1 s + the streamer's `connectionQuality`); Data saver = `setVideoQuality(LOW)` (the 360p simulcast layer)
+- CI and release: `.github/workflows/` (`ci.yml`; `release.yml` publishes on a pushed `v*` tag matching the desktop version, or from Run workflow with "Publish"; `pages.yml` publishes `site/`). Actions are pinned to full commit SHAs; Dependabot updates them
+- Security (docs/14): token without `canUpdateOwnMetadata`/`canPublishData`; name/photo/addrs through `POST /me`; owner and host routes require `SHARESCREEN_HOST_KEY` (main injects `x-accord-host-key` into the app's requests to 127.0.0.1); password stored only as a hash; invite = `invite:<key>` in the password header; `services/security.ts` (limits, bans, Host header)
+- Ending the session: `HostService.stop('end' | 'handoff')` → `POST /session/end`; room notices on topic `accord.session` (`ended`, `handoff`, `invite-rotated`)
+- Voice shortcuts: `main/hotkeys.ts` (GetAsyncKeyState on Windows, globalShortcut elsewhere), hotkeys.json in userData; PTT = `track.enabled` in the pill. Tests: `SHARESCREEN_FAKE_HOLD=1` lets you turn the mode on and the shortcut comes through `CallCommand { type: 'ptt' }`
+- Pointing: viewer → `POST /pointer` → topic `accord.pointer` → pill (if streaming) → `PointerWindow` (`pointer` page) + `Pings` in the viewer
+- Mini stream: `ViewerManager.toggleMini` swaps the window (frameless, `focusable: false`, content protection); lock = `setIgnoreMouseEvents`
+- Windows: `disable-features=CalculateNativeWinOcclusion` keeps overlay windows from "freezing" after lock/idle
 
-## Convenções
-- Licença Apache 2.0 (`LICENSE`, `NOTICE`); contribuições por PR revisadas pelo mantenedor (`CONTRIBUTING.md`, `.github/CODEOWNERS`, `SECURITY.md`)
-- Docs e UI em PT-BR
-- Marcar suposições em docs como [Hipótese] até validar; nunca inventar comportamento de API sem checar a documentação
-- Atualizar `docs/` quando uma decisão mudar
-- O usuário roda `bun install` por conta própria no Windows
+## Conventions
+- Apache 2.0 license (`LICENSE`, `NOTICE`); contributions through PRs reviewed by the maintainer (`CONTRIBUTING.md`, `.github/CODEOWNERS`, `SECURITY.md`); `main` is protected (PR + review + CI, squash only, admins bypass)
+- Documentation in English (README, `docs/`, CONTRIBUTING, templates). UI in Portuguese and English (both dictionaries). Code comments may still be in Portuguese
+- Mark assumptions in docs as [Hypothesis] until validated; never invent API behavior without checking the documentation
+- Update `docs/` when a decision changes
+- The user runs `bun install` on Windows themselves

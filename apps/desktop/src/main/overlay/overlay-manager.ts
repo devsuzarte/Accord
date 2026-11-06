@@ -23,7 +23,7 @@ const PANEL_WIDTH = 416
 
 /**
  * Pill + painel preso ao pill.
- * Técnicas em docs/09-estudo-overlay-opencluely.md §2 e §3.
+ * Técnicas em docs/09-overlay-study-opencluely.md §2 e §3.
  */
 export interface OverlayManagerOptions {
   /** Canto inicial quando ainda não há posição salva. */
