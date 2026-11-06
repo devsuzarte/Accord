@@ -57,6 +57,7 @@ App desktop de voz + compartilhamento de tela em overlay, inspirado no Discord. 
 - Windows: `disable-features=CalculateNativeWinOcclusion` evita janelas do overlay "congeladas" depois de bloqueio/inatividade
 
 ## Convenções
+- Licença Apache 2.0 (`LICENSE`, `NOTICE`); contribuições por PR revisadas pelo mantenedor (`CONTRIBUTING.md`, `.github/CODEOWNERS`, `SECURITY.md`)
 - Docs e UI em PT-BR
 - Marcar suposições em docs como [Hipótese] até validar; nunca inventar comportamento de API sem checar a documentação
 - Atualizar `docs/` quando uma decisão mudar

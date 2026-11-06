@@ -1,0 +1,23 @@
+name: Ideia ou feature
+description: Proponha algo novo (abra antes de mandar um PR grande)
+labels: [ideia]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Que problema resolve
+      description: A situação real em que você sente falta disso.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Como você imagina
+    validations:
+      required: true
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contribuição
+      options:
+        - label: Quero fazer o pull request disto

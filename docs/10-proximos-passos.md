@@ -9,6 +9,8 @@ Cada marco termina com algo que dá para **usar e mostrar**. Tamanhos relativos:
      ✅          ✅           ✅              ✅            ✅               ✅                              ✅                                 ✅                         ✅                ⏸ adiado
 ```
 
+> **Decisão (05/11/2026):** a licença passou de MIT para **Apache License 2.0**, e o projeto abriu para contribuições por pull request, com revisão do mantenedor (`CONTRIBUTING.md`, `.github/CODEOWNERS`). As versões até a 0.4.0 publicadas como MIT continuam MIT para quem já as tem.
+
 > **Decisão (03/11/2026):** M3 e M4 foram adiados. (Os convites por link do M4 saíram no M10, em 04/11/2026.) A entrada continua aberta só com um nome (`POST /join`, desligável com `OPEN_JOIN=false`), e a porta padrão passou a ser **7870**. O servidor é distribuído como um pacote de um clique, que sobe o LiveKit junto.
 
 ## Validação no Windows (o que só dá para confirmar aí)
@@ -143,7 +145,7 @@ Sem contas ainda: cada um digita um nome e entra no canal "Geral". É um atalho 
 | 9.4 | **Chat temporário**: mensagens e anexos (até 15 MB cada, 300 MB por sessão) na memória e numa pasta temporária do servidor, apagados quando ele fecha; avisos pelos dados do LiveKit (tópico `accord.chat`, só vale o que vem do servidor) | `routes/session.ts`, `renderer/chat/`, `main/overlay/chat-window.ts` |
 | 9.5 | **Troca de host** (first in, first host): fila pela ordem de entrada no LiveKit, endereços de cada um no atributo `addrs`, cópia da sessão a cada 10 s (todos guardam texto; os 2 primeiros da fila guardam também os anexos) | `pill/call/migration.ts`, `main/network/session-mirror.ts` |
 | 9.6 | **Volume por pessoa** 0–200%: vozes pelo WebAudio (`webAudioMix`), ganho por pessoa | `shared/localVolumes.ts` |
-| 9.7 | Licença MIT e avisos de terceiros | `LICENSE`, `THIRD_PARTY_NOTICES.md` |
+| 9.7 | Licença (MIT na época; **Apache 2.0 desde 05/11/2026**) e avisos de terceiros | `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md` |
 
 **Correção 0.2.1:** sair da chamada fecha também as transmissões que você estava assistindo (antes a janela do viewer ficava aberta com a conexão própria), e o viewer fecha sozinho 4 s depois que a transmissão acaba ou quem transmitia sai.
 

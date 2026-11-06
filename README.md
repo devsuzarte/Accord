@@ -124,6 +124,10 @@ Fora por enquanto: contas e vários canais (M3) e o assistente de conexão (M4).
 
 Testar no Windows (voz, tela com som, instalador e servidor) e seguir a lista de validação em [10-proximos-passos](docs/10-proximos-passos.md#validação-no-windows-o-que-só-dá-para-confirmar-aí).
 
+## Contribuir
+
+Contribuições são bem-vindas. Leia o [CONTRIBUTING.md](CONTRIBUTING.md) antes de abrir um pull request: ele explica como propor uma mudança, o que é conferido e como a revisão funciona. Falhas de segurança vão por um canal privado ([SECURITY.md](SECURITY.md)), nunca em issue pública. Todos seguem o [código de conduta](CODE_OF_CONDUCT.md).
+
 ## Licença
 
-MIT — veja [LICENSE](LICENSE). O instalador também leva programas de terceiros (LiveKit, Electron, RNNoise e outros), cada um com a sua licença: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[Apache License 2.0](LICENSE) — veja também o [NOTICE](NOTICE). Ao enviar uma contribuição, você concorda que ela entra sob a mesma licença (seção 5 da Apache 2.0). O instalador também leva programas de terceiros (LiveKit, Electron, RNNoise e outros), cada um com a sua licença: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

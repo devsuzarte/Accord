@@ -18,6 +18,8 @@ asar: true
 extraResources:
   - from: ../../LICENSE
     to: LICENSE.txt
+  - from: ../../NOTICE
+    to: NOTICE.txt
   - from: ../../THIRD_PARTY_NOTICES.md
     to: THIRD_PARTY_NOTICES.md
   - from: ../../release/accord-server

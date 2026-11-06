@@ -2,7 +2,7 @@
   "name": "sharescreen",
   "private": true,
   "version": "0.4.0",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "packageManager": "bun@1.4.4",
   "workspaces": [
     "apps/*",

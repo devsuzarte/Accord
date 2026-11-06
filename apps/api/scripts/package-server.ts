@@ -51,6 +51,9 @@ if (existsSync(livekitSource)) {
 
 // O LiveKit é Apache-2.0: a licença vai junto com o binário.
 copyFileSync(join(root, 'infra', 'LICENSE-apache-2.0.txt'), join(out, 'LICENSE-livekit.txt'))
+// O próprio Accord também é Apache-2.0 (licença e NOTICE vão junto, como pede a seção 4).
+copyFileSync(join(root, 'LICENSE'), join(out, 'LICENSE.txt'))
+copyFileSync(join(root, 'NOTICE'), join(out, 'NOTICE.txt'))
 
 writeFileSync(
   join(out, 'LEIA-ME.txt'),

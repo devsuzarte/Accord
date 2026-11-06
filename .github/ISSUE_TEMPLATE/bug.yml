@@ -1,0 +1,49 @@
+name: Algo não funciona
+description: Relate um problema no Accord (falha de segurança vai pelo SECURITY.md)
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: O que aconteceu
+      description: E o que você esperava que acontecesse.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Como reproduzir
+      placeholder: |
+        1. Hospedar um canal com senha
+        2. Um amigo entra pelo convite
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versão do Accord
+      description: Aba Você › Atualizações, ou o nome do instalador.
+      placeholder: 0.4.0
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Windows
+      placeholder: Windows 11 23H2
+  - type: dropdown
+    id: network
+    attributes:
+      label: Como vocês se conectam
+      options:
+        - Mesma rede
+        - Radmin VPN
+        - Tailscale
+        - Outra VPN
+        - Não sei
+  - type: textarea
+    id: logs
+    attributes:
+      label: Registros
+      description: Se possível, anexe o main.log (pasta de logs do Accord). Apague senhas e IPs antes.
