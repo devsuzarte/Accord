@@ -41,19 +41,38 @@ and hides everyone's home IP behind it.
 - Network bandwidth of A1 VMs scales with the OCPU count (about 1 Gbps per OCPU). Even 1 Gbps is
   far above what a group of friends needs.
 
-**Does it fit?** A heavy evening: 1 stream at 1080p30 (5.4 Mbps) to 4 viewers + 6 voices
-(~0.05 Mbps each, to 5 people) ≈ 23 Mbps out of the server. Four hours a day for 30 days
-≈ **1.25 TB/month**, an eighth of the 10 TB. LiveKit doesn't re-encode, so 2 Arm cores are plenty
-for a small group **[Hypothesis — measure with `top` during a real call]**.
+**Does it fit?** Yes, see the sizing below: 10 people with one 1080p stream every evening is
+~2.6 TB/month, a quarter of the 10 TB. LiveKit doesn't re-encode, so 2 Arm cores should be plenty
+for 10 people **[Hypothesis — measure with `top` during a real call]**.
 
-### Other paths (not chosen)
+### Sizing for 10 people (one channel)
 
-| Path | Why not now |
-|---|---|
-| A friend's PC that stays on, with port forwarding | Same upload limit as today; exposes that friend's IP |
-| Free tiers that expire after 12 months | Not free forever |
-| [Hypothesis] free tiers with little egress (around 1 GB/month) | One evening of streaming already goes over |
-| LiveKit Cloud | Paid beyond its free quota, and the API still needs a home |
+The server sends one copy of each stream to each viewer and one copy of each voice to each listener.
+Top layers from our presets: 720p30 = 2 Mbps, 1080p30 = 5 Mbps. Voice ≈ 40 kbps per listener
+**[Hypothesis — Opus with DTX sends much less during silence, so this is an upper bound]**.
+
+| Evening with 10 people | Out of the server | Per hour | 4 h/day for 30 days |
+|---|---|---|---|
+| Voice only | 10 × 9 × 0.04 ≈ 3.6 Mbps | ~1.6 GB | ~0.2 TB |
+| 1 stream at 720p30 to 9 viewers | 18 + 3.6 ≈ 22 Mbps | ~10 GB | ~1.2 TB |
+| 1 stream at 1080p30 to 9 viewers | 45 + 3.6 ≈ 49 Mbps | ~22 GB | ~2.6 TB |
+| 2 streams at 1080p30 at the same time | ≈ 94 Mbps | ~42 GB | ~5 TB |
+
+The same numbers are the **upload** a home host would need. Even the lightest stream (22 Mbps) is
+beyond many home plans, which is why hosting at home is unstable with 10 people.
+
+### Free options compared (checked on 2026-11-08)
+
+| Option | What's free | For 10 people | Verdict |
+|---|---|---|---|
+| **Oracle Cloud Always Free** | Arm VM 2 OCPU / 12 GB, **10 TB/month out** [Verified] | Fits even 2 simultaneous 1080p streams every evening | **Chosen.** Catch: card verification at sign-up [Hypothesis] and idle reclaim |
+| LiveKit Cloud (Build plan) | 5,000 participant minutes and **50 GB** downstream a month, no card; hard cap — new requests fail after it [Verified] | 50 GB ≈ 2.3 h of one 1080p stream to 9 people a **month**; 5,000 min ≈ 8 h of 10 people talking | Too small |
+| Cloudflare Realtime (SFU + TURN) | **1,000 GB/month** egress shared by SFU and TURN; ingress free [Verified] | ≈ 45 h of one 1080p stream to 9 people a month | Generous, but it's a different SFU API: replacing LiveKit would mean rewriting the call layer. Its TURN doesn't relay over TCP [Verified] |
+| Google Cloud free tier | 1 e2-micro in US regions, **1 GB/month** out [Verified] | Not even one evening | No |
+| Azure for Students | US$100 for 12 months, no card, school e-mail [Verified]; first 100 GB/month out free, then US$0.181/GB from Brazil South [Verified] | The credit covers ~550 GB more: about 25 h of 1080p a year | Only for voice or tests |
+| Home host + Tailscale | Personal plan: **up to 6 users** [Verified] | Doesn't fit 10 | No |
+| Home host + ZeroTier | Personal plan: 10 users, **10 devices**, no way to add more [Verified] | Exactly 10, no slack; the host's upload problem stays | Stopgap |
+| Home host + playit.gg | Free tier relays plain UDP; custom TCP+UDP tunnels need Premium [Verified on playit.gg] | Accord needs TCP (API) + UDP (media); the upload problem stays; the relay sees the unencrypted API traffic | No |
 
 ## Target architecture
 
@@ -138,5 +157,10 @@ The app keeps both modes: "host on my PC" stays for LAN parties and for whoever 
 - [Oracle: Always Free Resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/resourceref.htm)
 - [LiveKit: Self-hosting › Deployment](https://docs.livekit.io/transport/self-hosting/deployment/)
 - [Bun: Single-file executables (cross-compiling targets)](https://bun.com/docs/compiler/executables)
+- [LiveKit Cloud pricing](https://livekit.com/pricing) and [quotas and limits](https://docs.livekit.io/deploy/admin/quotas-and-limits/)
+- [Cloudflare Realtime: pricing](https://developers.cloudflare.com/realtime/sfu/platform/pricing/) and [TURN FAQ](https://developers.cloudflare.com/realtime/turn/faq/)
+- [Google Cloud: Free Tier features](https://docs.cloud.google.com/free/docs/free-cloud-features)
+- [Azure for Students](https://azure.microsoft.com/en-us/free/students) and [Azure bandwidth pricing](https://azure.microsoft.com/en-us/pricing/details/bandwidth/)
+- [Tailscale pricing](https://tailscale.com/pricing), [ZeroTier pricing](https://www.zerotier.com/pricing), [playit.gg](https://playit.gg/)
 - [Home Assistant DuckDNS add-on (DuckDNS is free; Let's Encrypt)](https://github.com/home-assistant/addons/blob/master/duckdns/README.md)
 - LiveKit release asset checked: `https://github.com/livekit/livekit/releases/download/v1.13.11/livekit_1.13.11_linux_arm64.tar.gz`
