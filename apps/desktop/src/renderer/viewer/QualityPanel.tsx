@@ -88,6 +88,9 @@ export function QualityPanel({
     [t('viewer.quality.streamer', { name: streamerName }), t(connectionKey[stats.streamer])],
   ]
   if (stats.codec) rows.push([t('viewer.quality.codec'), stats.codec])
+  if (stats.route !== 'unknown') {
+    rows.push([t('viewer.quality.route'), t(`viewer.quality.route.${stats.route}`)])
+  }
 
   const hint = t(`viewer.diag.${stats.diagnosis}` as MessageKey, {
     name: streamerName,
@@ -105,6 +108,9 @@ export function QualityPanel({
         {t('viewer.quality.title')}: {t(levelKey[stats.level])}
       </p>
       <p className="viewer__diagnosis">{hint}</p>
+      {stats.route === 'tcp' && stats.level !== 'good' && (
+        <p className="viewer__diagnosis">{t('viewer.diag.tcp')}</p>
+      )}
       <dl className="viewer__rows">
         {rows.map(([label, value, extra]) => (
           <div key={label} className="viewer__row">

@@ -90,6 +90,7 @@ export const IpcChannel = {
   HostStart: 'host:start',
   HostStop: 'host:stop',
   HostRotateInvite: 'host:rotate-invite',
+  HostAllowFirewall: 'host:allow-firewall',
   HostStateChanged: 'host:state-changed',
   HostSetPassword: 'host:set-password',
   ChatReport: 'chat:report',

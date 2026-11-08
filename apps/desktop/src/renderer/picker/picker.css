@@ -234,6 +234,29 @@ body,
   gap: 8px;
 }
 
+.encoder {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.encoder__select {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--material-border);
+  border-radius: var(--radius-sm);
+  background: var(--material-raised-hover);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.encoder__select:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
 .sound {
   display: flex;
   align-items: center;

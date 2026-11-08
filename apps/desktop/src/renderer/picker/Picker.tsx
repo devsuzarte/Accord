@@ -1,4 +1,10 @@
-import type { MessageKey, ShareKind, ShareSource, StreamQualityPreset } from '@sharescreen/shared'
+import type {
+  MessageKey,
+  ShareCodec,
+  ShareKind,
+  ShareSource,
+  StreamQualityPreset,
+} from '@sharescreen/shared'
 import { AppWindow, Monitor, X } from 'lucide-react'
 import { useT } from '../shared/i18n'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -12,6 +18,18 @@ const presetOptions: Array<{ id: StreamQualityPreset; detail: string; title?: Me
 
 const PRESET_KEY = 'sharescreen.share.preset'
 const AUDIO_KEY = 'sharescreen.share.audio'
+const CODEC_KEY = 'sharescreen.share.codec'
+const codecs: ShareCodec[] = ['auto', 'h264', 'vp8']
+
+function readCodec(): ShareCodec {
+  try {
+    const value = localStorage.getItem(CODEC_KEY)
+    if (value === 'h264' || value === 'vp8') return value
+  } catch {
+    /* padrão */
+  }
+  return 'auto'
+}
 
 function readPreset(): StreamQualityPreset {
   try {
@@ -51,6 +69,7 @@ export function Picker() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [preset, setPreset] = useState<StreamQualityPreset>(readPreset)
   const [audio, setAudio] = useState(readAudio)
+  const [codec, setCodec] = useState<ShareCodec>(readCodec)
 
   // Lista e atualiza as miniaturas enquanto o seletor está aberto.
   useEffect(() => {
@@ -84,15 +103,17 @@ export function Picker() {
       if (!source) return
       remember(PRESET_KEY, preset)
       remember(AUDIO_KEY, audio ? '1' : '0')
+      remember(CODEC_KEY, codec)
       window.platform.share.select({
         sourceId: source.id,
         sourceName: source.name,
         kind: source.kind,
         preset,
         audio: audio && audioSupported,
+        codec,
       })
     },
-    [preset, audio, audioSupported],
+    [preset, audio, audioSupported, codec],
   )
 
   useEffect(() => {
@@ -206,6 +227,20 @@ export function Picker() {
           </div>
 
           <div className="picker__actions">
+            <label className="encoder" title={t(`picker.codec.${codec}Hint`)}>
+              <span className="sound__label">{t('picker.codec')}</span>
+              <select
+                className="encoder__select"
+                value={codec}
+                onChange={(e) => setCodec(e.target.value as ShareCodec)}
+              >
+                {codecs.map((id) => (
+                  <option key={id} value={id}>
+                    {t(`picker.codec.${id}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="sound" title={audioHint}>
               <button
                 type="button"

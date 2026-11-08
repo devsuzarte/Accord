@@ -3,7 +3,7 @@
   "productName": "Accord",
   "private": true,
   "license": "Apache-2.0",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Accord — voz e compartilhamento de tela em overlay",
   "author": "devsuzarte",
   "main": "./out/main/index.js",

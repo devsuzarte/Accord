@@ -39,6 +39,16 @@ without a token → 401; `.exe` → 415; invite with the right key → 200, wron
 name from another IP → 409; guessed password → 429 after 8 attempts; disconnected → old token 401
 and joining again 403.
 
+### Added in 0.5.0
+
+- `POST /stream-report` (a viewer's quality summary) goes **only to the streamer**
+  (`destinationIdentities`), with the name taken from the token, and at most one report every
+  3 s per viewer and streamer. The body is validated (level and diagnosis from a fixed list).
+- `GET/POST /speedtest` requires a call token, sends or accepts at most 8 MB and allows one test
+  every 20 s per person, so it can't be used to drain the host's bandwidth.
+- The firewall rule created from the Host tab only accepts private ranges and VPN ranges
+  (`RemoteAddress`), never the whole internet.
+
 ## What remains a risk
 
 - **The API and the voice signaling don't use their own encryption (HTTP and `ws://`).** The voice

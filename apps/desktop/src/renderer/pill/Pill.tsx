@@ -54,6 +54,8 @@ interface CallView {
   sharing: ShareState | null
   /** Última mensagem de erro (some sozinha do pill depois de alguns segundos). */
   error: string | null
+  /** A transmissão está travando (processador, banda ou quem assiste reclamou). */
+  shareTrouble: 'cpu' | 'bandwidth' | 'viewers' | null
   toggleMic(): void
   toggleDeafen(): void
   toggleShare(): void
@@ -86,8 +88,17 @@ function useDemoCall(): CallView {
   return {
     status: participants.length ? 'connected' : 'idle',
     participants,
-    sharing: me?.streaming ? { sourceName: 'Tela de exemplo', kind: 'screen', audio: 'on' } : null,
+    sharing: me?.streaming
+      ? {
+          sourceName: 'Tela de exemplo',
+          kind: 'screen',
+          preset: 'balanced',
+          codec: 'h264',
+          audio: 'on',
+        }
+      : null,
     error: null,
+    shareTrouble: null,
     toggleMic: () => updateMe((me) => ({ micMuted: !me.micMuted })),
     toggleDeafen: () =>
       updateMe((me) => ({ deafened: !me.deafened, micMuted: !me.deafened || me.micMuted })),
@@ -102,6 +113,7 @@ function useRealCall(): CallView {
   const participants = useCallStore((s) => s.participants)
   const sharing = useCallStore((s) => s.sharing)
   const error = useCallStore((s) => s.error)
+  const shareTrouble = useCallStore((s) => s.shareAdvice?.reason ?? null)
   const toggleMic = useCallStore((s) => s.toggleMic)
   const toggleDeafen = useCallStore((s) => s.toggleDeafen)
   const stopShare = useCallStore((s) => s.stopShare)
@@ -111,6 +123,7 @@ function useRealCall(): CallView {
     participants,
     sharing,
     error,
+    shareTrouble,
     toggleMic: () => void toggleMic(),
     toggleDeafen: () => void toggleDeafen(),
     // Começar abre o seletor; a transmissão começa quando a escolha voltar do main.
@@ -254,6 +267,14 @@ export function Pill() {
                   <p className="pill__notice pill__notice--error" role="alert">
                     {notice}
                   </p>
+                ) : call.sharing && call.shareTrouble ? (
+                  <button
+                    type="button"
+                    className="pill__notice pill__notice--action"
+                    onClick={() => window.platform.panel.toggle('channels')}
+                  >
+                    {t(`pill.shareTrouble.${call.shareTrouble}`)}
+                  </button>
                 ) : (
                   call.sharing?.audio === 'failed' && (
                     <p className="pill__notice">{t('pill.streamingNoAudio')}</p>

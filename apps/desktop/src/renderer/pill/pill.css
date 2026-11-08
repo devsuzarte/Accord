@@ -308,3 +308,19 @@
   color: var(--status-green);
   background: color-mix(in srgb, var(--status-green) 18%, transparent);
 }
+
+.pill__notice--action {
+  max-width: 240px;
+  border: 0;
+  background: none;
+  text-align: left;
+  line-height: 1.3;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--status-yellow) 50%, transparent);
+  text-underline-offset: 2px;
+}
+
+.pill__notice--action:focus-visible {
+  outline: 2px solid var(--status-yellow);
+}

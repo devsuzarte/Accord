@@ -31,9 +31,9 @@ Effort: S (days), M (one to two weeks), L (more than that).
 
 | Idea | Why it stands out | Effort |
 |---|---|---|
-| **Viewers warn the streamer.** Viewers send their diagnosis (already computed in M10) through the room; the streamer sees "2 people freezing — switch to Light & smooth?" | Answers "smooth for some and bad for others" without anyone opening stats | S |
-| **Network test before hosting.** Measure the upload to a friend and say how many people fit at each quality | The host is the bottleneck (their upload is multiplied by viewers). Showing that avoids frustration | M |
-| **Connection assistant** (what's left of M4): check the firewall, the port and whether Radmin/Tailscale is up, with what to do in each case | Today it's the part that requires the most networking knowledge | M |
+| ✅ (0.5.0) **Viewers warn the streamer.** Viewers send their diagnosis (already computed in M10) through the room; the streamer sees "2 people freezing — switch to Light & smooth?" | Answers "smooth for some and bad for others" without anyone opening stats | S |
+| ✅ partly (0.5.0: test to the host + upload table) **Network test before hosting.** Measure the upload to a friend and say how many people fit at each quality | The host is the bottleneck (their upload is multiplied by viewers). Showing that avoids frustration | M |
+| Partly (0.5.0: firewall in one click, UDP/TCP shown) **Connection assistant** (what's left of M4): check the firewall, the port and whether Radmin/Tailscale is up, with what to do in each case | Today it's the part that requires the most networking knowledge | M |
 | **Light spatial audio.** Each voice slightly to the left or right (WebAudio `PannerNode`) | With 5+ people talking, it's much easier to tell who's who | S |
 
 ## Gaming session
@@ -60,7 +60,7 @@ Effort: S (days), M (one to two weeks), L (more than that).
 ## What I'd do first
 
 1. Mute and push-to-talk shortcuts (S): a missing basic. ✅
-2. Viewers warn the streamer (S): closes the loop on the quality indicator.
+2. Viewers warn the streamer (S): closes the loop on the quality indicator. ✅
 3. Point at the streamer's screen (M): the feature nobody has, and it shows why the overlay exists. ✅
 4. Mini stream over your game (M). ✅
 
@@ -69,5 +69,5 @@ Effort: S (days), M (one to two weeks), L (more than that).
 - **Watching from the browser, without the app:** the invite page is HTTPS and the host's server is
   HTTP on an IP. The browser blocks that mix, and fixing it requires a certificate with a domain
   (Tailscale Funnel or a tunnel would solve it, but they change the "nobody's server" model).
-- **Friends without Radmin/Tailscale and without an open port:** it would need a TURN server on
-  the internet, which has bandwidth costs.
+- **Friends without Radmin/Tailscale and without an open port:** it would need a server on the
+  internet. A free-tier VM may cover it: see [15](15-cloud-server.md).

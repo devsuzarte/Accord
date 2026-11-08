@@ -16,6 +16,10 @@ const initial: CallSnapshot = {
   server: null,
   successor: null,
   pushToTalk: null,
+  shareStats: null,
+  shareAdvice: null,
+  speedTest: null,
+  shareAutoQuality: false,
   participants: [],
   error: null,
 }

@@ -157,6 +157,8 @@ export interface PlatformBridge {
     stop(mode?: HostStopMode): void
     /** Gera um link de convite novo (os antigos param de funcionar). */
     rotateInvite(): Promise<HostState>
+    /** Windows: libera as portas do Accord no firewall (pede permissão de administrador). */
+    allowFirewall(): Promise<HostState>
     /** Troca a senha do canal aberto por este app (null = sem senha). */
     setPassword(password: string | null): Promise<boolean>
     onChange(listener: (state: HostState) => void): Unsubscribe

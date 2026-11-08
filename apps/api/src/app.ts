@@ -8,6 +8,7 @@ import { joinRoutes } from './routes/join'
 import { meRoutes } from './routes/me'
 import { moderateRoutes } from './routes/moderate'
 import { pointerRoutes } from './routes/pointer'
+import { streamRoutes } from './routes/stream'
 import { sessionRoutes } from './routes/session'
 import { isLoopback } from './services/roles'
 import { hostHeaderAllowed, isBanned } from './services/security'
@@ -42,6 +43,7 @@ export const app = env.openJoin
       .use(meRoutes)
       .use(moderateRoutes)
       .use(pointerRoutes)
+      .use(streamRoutes)
       .use(sessionRoutes)
   : base
 

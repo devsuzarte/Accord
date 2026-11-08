@@ -80,6 +80,11 @@ function isCallCommand(value: unknown): value is CallCommand {
   }
   if (v.type === 'watch') return typeof v.identity === 'string' && v.identity.length < 128
   if (v.type === 'ptt') return typeof v.down === 'boolean'
+  if (v.type === 'retune-share') {
+    return presets.includes(v.preset)
+  }
+  if (v.type === 'auto-quality') return typeof v.enabled === 'boolean'
+  if (v.type === 'speed-test') return true
   return (
     v.type === 'join' &&
     typeof v.name === 'string' &&
@@ -108,6 +113,10 @@ const idleCall: CallSnapshot = {
   server: null,
   successor: null,
   pushToTalk: null,
+  shareStats: null,
+  shareAdvice: null,
+  speedTest: null,
+  shareAutoQuality: false,
   participants: [],
   error: null,
 }
@@ -124,7 +133,8 @@ function isShareRequest(value: unknown): value is ShareRequest {
     typeof v.sourceName === 'string' &&
     (v.kind === 'screen' || v.kind === 'window') &&
     presets.includes(v.preset) &&
-    typeof v.audio === 'boolean'
+    typeof v.audio === 'boolean' &&
+    (v.codec === undefined || v.codec === 'auto' || v.codec === 'h264' || v.codec === 'vp8')
   )
 }
 
@@ -282,6 +292,9 @@ export function registerIpcHandlers({
   ipcMain.on(IpcChannel.HostStop, (event, mode: unknown) => {
     if (fromPanel(event)) void host.stop(mode === 'handoff' ? 'handoff' : 'end')
   })
+  ipcMain.handle(IpcChannel.HostAllowFirewall, (event) =>
+    fromPanel(event) ? host.allowFirewall() : host.getState(),
+  )
   ipcMain.handle(IpcChannel.HostRotateInvite, (event) =>
     fromPanel(event) ? host.rotateInvite() : host.getState(),
   )

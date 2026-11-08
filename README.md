@@ -98,6 +98,7 @@ What already works:
 - **Point at the streamer's screen** and a **mini stream over your game**.
 - **Invite links:** "Copy invite" creates a link that opens Accord straight in the channel (with an invite key, never the password). Works when clicked in WhatsApp or Discord.
 - **Quality in the viewer:** badge with resolution and fps, a panel with bitrate, loss, delay and freezes, a diagnosis of where the bottleneck is, and a Data saver option (360p).
+- **Stream health (0.5.0):** a "Your stream" card shows what is really going out, whether the **graphics card** (H.264) or the processor (VP8) is encoding, what is holding the quality back (CPU or bandwidth), UDP vs TCP, and how each viewer is receiving it. Viewers report back automatically; the app suggests (or, with **Automatic quality**, applies) one step down without stopping the stream. Network test to the host, Windows firewall rule in one click, and an upload table for hosts.
 - **Delivery:** one-click server package, installer, **automatic updates** through GitHub Releases, published by GitHub Actions ([12](docs/12-publishing-a-release.md)), logs and diagnostics.
 
 Not yet: accounts and multiple channels (M3) and the connection assistant (M4). Ideas for what comes next: [13](docs/13-ideas.md). To review the visuals with **sample participants**, create `apps/desktop/.env.development.local` with `VITE_OVERLAY_DEMO=1`.
@@ -113,11 +114,12 @@ Not yet: accounts and multiple channels (M3) and the connection assistant (M4). 
 7. [User research](docs/07-user-research.md) — plan, interview script, overlay usability test
 8. [References](docs/08-references.md) — verified sources
 9. [Overlay study (OpenCluely)](docs/09-overlay-study-opencluely.md) — window techniques, what we took/adapted/dropped, overlay-first architecture and design direction
-10. [Next steps](docs/10-next-steps.md) — milestones M1–M11 up to a working app
+10. [Next steps](docs/10-next-steps.md) — milestones M1–M12 up to a working app
 11. [Research: noise suppression and Discord login](docs/11-noise-and-discord-research.md) — options evaluated and recommendation
 12. [Publishing a release](docs/12-publishing-a-release.md) — release and automatic update, step by step
 13. [Ideas](docs/13-ideas.md) — what could make Accord different, without paid services
 14. [Security](docs/14-security.md) — who could attack whom, what is fixed and what remains a risk
+15. [Cloud server](docs/15-cloud-server.md) — plan to move hosting to a free-tier VM
 
 ## Legend used in the documents
 

@@ -54,6 +54,8 @@ Desktop app for voice + screen sharing as an overlay, inspired by Discord. Full 
 - Voice shortcuts: `main/hotkeys.ts` (GetAsyncKeyState on Windows, globalShortcut elsewhere), hotkeys.json in userData; PTT = `track.enabled` in the pill. Tests: `SHARESCREEN_FAKE_HOLD=1` lets you turn the mode on and the shortcut comes through `CallCommand { type: 'ptt' }`
 - Pointing: viewer → `POST /pointer` → topic `accord.pointer` → pill (if streaming) → `PointerWindow` (`pointer` page) + `Pings` in the viewer
 - Mini stream: `ViewerManager.toggleMini` swaps the window (frameless, `focusable: false`, content protection); lock = `setIgnoreMouseEvents`
+- Stream health (M12): `pill/call/shareMonitor.ts` (sender stats every 2 s + viewer reports → `shareStats`/`shareAdvice` in the snapshot), `panel/StreamHealth.tsx`. Viewer → `POST /stream-report` → topic `accord.stream-report` only to the streamer. Codec: `ShareRequest.codec` (`auto` = H.264 if `mediaCapabilities` says powerEfficient, else VP8). Live quality change: `ActiveShare.retune` (applyConstraints + setParameters). Speed test: `GET/POST /speedtest` (8 MB max, 1 per 20 s). Firewall: `main/network/firewall.ts` (netsh check, elevated PowerShell to create)
+- Cloud hosting plan: `docs/15-cloud-server.md` (Oracle Always Free, Caddy + DuckDNS, admin key instead of loopback owner)
 - Windows: `disable-features=CalculateNativeWinOcclusion` keeps overlay windows from "freezing" after lock/idle
 
 ## Conventions

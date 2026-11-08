@@ -165,7 +165,7 @@ Presence (who is in which channel, who is speaking) **doesn't go to the database
 
 ### Endpoints
 
-> **Today (M1–M11):** `GET /health`, `GET /info`, `POST /join { name, viewer? }` (open join to the "General" channel), `/avatar`, `/me`, `/moderate`, `/pointer`, `/chat/*` and `/session/*`. See [14-security](14-security.md). The table below is the M3 target.
+> **Today (M1–M11):** `GET /health`, `GET /info`, `POST /join { name, viewer? }` (open join to the "General" channel), `/avatar`, `/me`, `/moderate`, `/pointer`, `/stream-report`, `/speedtest`, `/chat/*` and `/session/*`. See [14-security](14-security.md). The table below is the M3 target.
 
 | Method | Route | Description |
 |---|---|---|
@@ -207,6 +207,8 @@ Passwords with `Bun.password.hash` (argon2id). Rate limit on `/auth/*`.
 **[Decision]** In host mode, use **UDP mux on a single port (7882)** instead of the 50000–60000 range. That simplifies port forwarding. **[Verified]** When `rtc.udp_port` is set, the port range isn't used.
 
 ## Migrating to a scalable server
+
+> The first step (one free-tier VM running the same `accord-server` behind TLS) is planned in [15-cloud-server](15-cloud-server.md). The list below is for growing past one VM.
 
 1. API: SQLite → Postgres (Drizzle swaps the driver) and avatars → S3-compatible storage.
 2. In-memory presence → Redis (pub/sub) to run several API instances.

@@ -11,12 +11,15 @@ import type {
   Profile,
   Role,
   ShareRequest,
+  StreamQualityPreset,
+  StreamReport,
 } from '@sharescreen/shared'
 import {
   normalizeServerUrl,
   PASSWORD_HEADER,
   POINTER_TOPIC,
   SESSION_TOPIC,
+  STREAM_REPORT_TOPIC,
 } from '@sharescreen/shared'
 import { ConnectionState, DisconnectReason, Room, RoomEvent, Track } from 'livekit-client'
 import type {
@@ -46,6 +49,8 @@ import type { Successor } from './migration'
 import { noiseContext, RnnoiseProcessor } from './noise'
 import { startScreenShare } from './screenShare'
 import type { ActiveShare } from './screenShare'
+import { startShareMonitor } from './shareMonitor'
+import type { ShareMonitor } from './shareMonitor'
 import { playSound, setSoundsOutput } from './sounds'
 import type { SoundName } from './sounds'
 
@@ -74,6 +79,11 @@ interface CallActions {
   moderate(action: ModerationAction, target: string): Promise<void>
   /** Nome ou foto mudaram na aba Você: atualiza para os outros na hora. */
   applyProfile(profile: Profile): Promise<void>
+  /** Troca a qualidade da transmissão sem parar (nem escolher a tela de novo). */
+  retuneShare(preset: StreamQualityPreset): Promise<void>
+  setShareAutoQuality(enabled: boolean): void
+  /** Mede a banda até o host (baixando e mandando alguns MB). */
+  runSpeedTest(): Promise<void>
 }
 
 export type CallStore = CallSnapshot & CallActions
@@ -84,6 +94,15 @@ let leavingOnPurpose = false
 let micBeforeDeafen = true
 let serverUrl = ''
 let activeShare: ActiveShare | null = null
+let shareMonitor: ShareMonitor | null = null
+const AUTO_QUALITY_KEY = 'sharescreen.share.autoQuality'
+function readAutoQuality(): boolean {
+  try {
+    return localStorage.getItem(AUTO_QUALITY_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 /** Token da chamada: também identifica você nos pedidos de moderação. */
 let token = ''
 let mutes: LocalMutes = readLocalMutes()
@@ -406,11 +425,18 @@ export const useCallStore = create<CallStore>((set, get) => {
 
   /** Larga a sala atual (sem mexer no chat). */
   const dropRoom = () => {
+    stopMonitor()
     void activeShare?.stop()
     activeShare = null
     audioHost().replaceChildren()
     room = null
     token = ''
+  }
+
+  const stopMonitor = () => {
+    shareMonitor?.stop()
+    shareMonitor = null
+    if (get().shareStats || get().shareAdvice) set({ shareStats: null, shareAdvice: null })
   }
 
   const sound = (name: SoundName) => {
@@ -441,6 +467,7 @@ export const useCallStore = create<CallStore>((set, get) => {
       error,
       server: null,
       successor: null,
+      speedTest: null,
     })
   }
 
@@ -561,6 +588,7 @@ export const useCallStore = create<CallStore>((set, get) => {
           if (participant) return
           if (topic === SESSION_TOPIC) return handleSessionEvent(payload)
           if (topic === POINTER_TOPIC) return handlePointer(payload)
+          if (topic === STREAM_REPORT_TOPIC) return handleStreamReport(payload)
           handleChatData(payload, false, topic)
         },
       )
@@ -619,6 +647,19 @@ export const useCallStore = create<CallStore>((set, get) => {
     if (ping.type !== 'ping' || !room || ping.target !== room.localParticipant.identity) return
     if (!get().sharing || !pointerAllowed()) return
     window.platform.pointer.show(ping)
+  }
+
+  const handleStreamReport = (payload: Uint8Array) => {
+    let report: StreamReport
+    try {
+      report = JSON.parse(new TextDecoder().decode(payload)) as StreamReport
+    } catch {
+      return
+    }
+    if (report.type !== 'report' || !room || report.target !== room.localParticipant.identity) {
+      return
+    }
+    shareMonitor?.report(report)
   }
 
   // Mensagem nova de outra pessoa: um "tic" baixinho (só o histórico ao entrar não toca).
@@ -786,6 +827,10 @@ export const useCallStore = create<CallStore>((set, get) => {
     server: null,
     successor: null,
     pushToTalk: null,
+    shareStats: null,
+    shareAdvice: null,
+    speedTest: null,
+    shareAutoQuality: readAutoQuality(),
 
     async join(name, joinUrl, joinPassword) {
       if (get().status !== 'idle') return
@@ -891,18 +936,37 @@ export const useCallStore = create<CallStore>((set, get) => {
       try {
         activeShare = await startScreenShare(r.localParticipant, request, () => {
           // A fonte acabou sozinha (ex.: a janela compartilhada fechou).
+          stopMonitor()
           activeShare = null
           sound('share-stop')
           set({ sharing: null })
           refresh()
         })
         sound('share-start')
-        const audio = activeShare.audio
+        const share = activeShare
+        const audio = share.audio
         log(
-          `transmitindo; som: ${audio.state}${audio.state === 'failed' ? ` (${audio.reason})` : ''}`,
+          `transmitindo (${share.codec}); som: ${audio.state}${audio.state === 'failed' ? ` (${audio.reason})` : ''}`,
         )
+        shareMonitor = startShareMonitor(share, {
+          auto: () => get().shareAutoQuality,
+          onUpdate: (shareStats, shareAdvice) => {
+            if (activeShare !== share) return
+            set({ shareStats, shareAdvice })
+          },
+          onRetune: (preset) => {
+            log(`qualidade automática: baixando para ${preset}`)
+            void get().retuneShare(preset)
+          },
+        })
         set({
-          sharing: { sourceName: request.sourceName, kind: request.kind, audio: audio.state },
+          sharing: {
+            sourceName: request.sourceName,
+            kind: request.kind,
+            preset: request.preset,
+            codec: share.codec,
+            audio: audio.state,
+          },
           error:
             audio.state === 'failed'
               ? t('call.notice.noAudio', { reason: audio.reason })
@@ -925,12 +989,80 @@ export const useCallStore = create<CallStore>((set, get) => {
     },
 
     async stopShare() {
+      stopMonitor()
       const share = activeShare
       activeShare = null
       if (share) sound('share-stop')
       await share?.stop()
       set({ sharing: null })
       refresh()
+    },
+
+    async retuneShare(preset) {
+      const share = activeShare
+      const sharing = get().sharing
+      if (!share || !sharing || sharing.preset === preset) return
+      await share.retune(preset)
+      if (activeShare !== share) return
+      set({ sharing: { ...sharing, preset }, shareAdvice: null })
+    },
+
+    setShareAutoQuality(enabled) {
+      try {
+        localStorage.setItem(AUTO_QUALITY_KEY, enabled ? '1' : '0')
+      } catch {
+        /* ignora */
+      }
+      shareMonitor?.setAuto(enabled)
+      set({ shareAutoQuality: enabled })
+    },
+
+    async runSpeedTest() {
+      if (!room || !serverUrl || !token || get().speedTest?.state === 'running') return
+      const base = serverUrl
+      const auth = { authorization: `Bearer ${token}` }
+      const before = get().speedTest
+      set({ speedTest: { state: 'running' } })
+      try {
+        // Ida e volta curta (o /health não pesa nada).
+        const pingStart = performance.now()
+        await fetch(`${base}/health`, { cache: 'no-store' })
+        const rttMs = Math.round(performance.now() - pingStart)
+        // Host → você.
+        const downStart = performance.now()
+        const down = await fetch(`${base}/speedtest?bytes=${8 * 1024 * 1024}`, {
+          headers: auth,
+          cache: 'no-store',
+        })
+        if (!down.ok) throw new Error(String(down.status))
+        const downBytes = (await down.arrayBuffer()).byteLength
+        const downMbps = (downBytes * 8) / ((performance.now() - downStart) / 1000) / 1e6
+        // Você → host.
+        const body = new Uint8Array(4 * 1024 * 1024)
+        for (let i = 0; i < body.length; i += 65536) {
+          crypto.getRandomValues(body.subarray(i, i + 65536))
+        }
+        const upStart = performance.now()
+        const up = await fetch(`${base}/speedtest`, {
+          method: 'POST',
+          headers: { ...auth, 'content-type': 'application/octet-stream' },
+          body,
+        })
+        if (!up.ok) throw new Error(String(up.status))
+        const upResult = (await up.json()) as { bytes: number }
+        const upMbps = (upResult.bytes * 8) / ((performance.now() - upStart) / 1000) / 1e6
+        if (serverUrl !== base) return
+        log(
+          `teste de rede: ↓ ${downMbps.toFixed(1)} Mbps, ↑ ${upMbps.toFixed(1)} Mbps, ${rttMs} ms`,
+        )
+        set({ speedTest: { state: 'done', downMbps, upMbps, rttMs } })
+      } catch (error) {
+        log(`teste de rede falhou: ${error}`)
+        // Falhou (ou pediu de novo cedo demais): mantém a medição anterior, se houver.
+        if (serverUrl === base) {
+          set({ speedTest: before?.state === 'done' ? before : { state: 'failed' } })
+        }
+      }
     },
 
     watch(participant) {
@@ -1067,6 +1199,10 @@ export function startReportingCallState(): () => void {
     server: s.server,
     successor: s.successor,
     pushToTalk: s.pushToTalk,
+    shareStats: s.shareStats,
+    shareAdvice: s.shareAdvice,
+    speedTest: s.speedTest,
+    shareAutoQuality: s.shareAutoQuality,
   })
   window.platform.call.report(toSnapshot(useCallStore.getState()))
   const unsubscribeStore = useCallStore.subscribe((s) => window.platform.call.report(toSnapshot(s)))
@@ -1099,6 +1235,12 @@ export function startReportingCallState(): () => void {
         return store.localMute(command.name, command.kind, command.muted)
       case 'moderate':
         return void store.moderate(command.action, command.target)
+      case 'retune-share':
+        return void store.retuneShare(command.preset)
+      case 'auto-quality':
+        return store.setShareAutoQuality(command.enabled)
+      case 'speed-test':
+        return void store.runSpeedTest()
       case 'watch': {
         const person = store.participants.find((p) => p.userId === command.identity)
         return person ? store.watch(person) : undefined

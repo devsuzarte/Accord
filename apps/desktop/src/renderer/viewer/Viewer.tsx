@@ -101,6 +101,27 @@ export function Viewer() {
     choice,
   )
 
+  // Conta a quem transmite como está chegando (a cada 4 s, só o resumo, pelo servidor).
+  const lastReport = useRef(0)
+  useEffect(() => {
+    const a = access.current
+    if (!stats || !a || stats.diagnosis === 'warming') return
+    const now = Date.now()
+    if (now - lastReport.current < 4000) return
+    lastReport.current = now
+    void fetch(`${a.serverUrl}/stream-report`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${a.token}` },
+      body: JSON.stringify({
+        target: a.target,
+        level: stats.level,
+        diagnosis: stats.diagnosis,
+        fps: stats.fps,
+        height: stats.height,
+      }),
+    }).catch(() => undefined)
+  }, [stats])
+
   useEffect(() => {
     let room: Room | null = null
     let cancelled = false

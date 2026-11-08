@@ -45,6 +45,20 @@ const routeRank: Record<ServerRoute, number> = {
   saved: 5,
 }
 
+/**
+ * Para escolher o caminho até um servidor achado por vários endereços: rede local primeiro;
+ * entre as VPNs (Radmin, Tailscale, outras), a mais rápida — uma VPN passando por relay tem
+ * mais atraso, e é ela que costuma deixar a transmissão instável.
+ */
+const pathRank: Record<ServerRoute, number> = {
+  'this-pc': 0,
+  lan: 1,
+  radmin: 2,
+  tailscale: 2,
+  vpn: 2,
+  saved: 3,
+}
+
 function isServerInfo(value: unknown): value is ServerInfo {
   const v = value as ServerInfo
   return (
@@ -270,8 +284,8 @@ export class DiscoveryService {
       const current = byId.get(server.id)
       if (
         !current ||
-        routeRank[server.route] < routeRank[current.route] ||
-        (server.route === current.route && server.latencyMs < current.latencyMs)
+        pathRank[server.route] < pathRank[current.route] ||
+        (pathRank[server.route] === pathRank[current.route] && server.latencyMs < current.latencyMs)
       ) {
         byId.set(server.id, server)
       }

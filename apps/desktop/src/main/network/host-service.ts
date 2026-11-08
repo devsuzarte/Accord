@@ -7,6 +7,7 @@ import { app, BrowserWindow, session } from 'electron'
 import { DEFAULT_API_PORT, HOST_KEY_HEADER, IpcChannel } from '@sharescreen/shared'
 import type { HostAddress, HostStartOptions, HostState, HostStopMode } from '@sharescreen/shared'
 import type { SessionMirror } from './session-mirror'
+import { allowFirewall, firewallState } from './firewall'
 import { localInterfaces } from './interfaces'
 
 const LOCAL_URL = `http://127.0.0.1:${DEFAULT_API_PORT}`
@@ -37,6 +38,7 @@ export class HostService {
     error: null,
     locked: false,
     invite: null,
+    firewall: process.platform === 'win32' ? 'unknown' : 'unsupported',
   }
 
   /**
@@ -65,8 +67,19 @@ export class HostService {
     return { ...this.state, addresses: this.addresses() }
   }
 
+  /** Libera as portas no firewall do Windows (aviso do UAC) e confere de novo. */
+  async allowFirewall(): Promise<HostState> {
+    const ok = await allowFirewall()
+    if (!ok) console.warn('[hospedar] firewall: cancelado ou sem permissão')
+    this.update({ firewall: await firewallState() })
+    return this.getState()
+  }
+
   /** Confere se já tem um servidor aberto neste PC (por fora do app). */
   async refresh(): Promise<HostState> {
+    void firewallState().then((firewall) => {
+      if (firewall !== this.state.firewall) this.update({ firewall })
+    })
     if (!this.child && this.state.status !== 'starting') {
       const running = await this.isUp()
       const status = running ? 'external' : this.command() ? 'stopped' : 'unavailable'

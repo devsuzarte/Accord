@@ -1,8 +1,8 @@
 import { SHARE_AUDIO_PORT_MESSAGE } from '@sharescreen/shared'
-import type { ShareRequest, StreamQualityPreset } from '@sharescreen/shared'
+import type { ShareCodec, ShareRequest, StreamQualityPreset } from '@sharescreen/shared'
 import { t } from '../../shared/i18n'
 import { AudioPresets, ScreenSharePresets, Track, VideoPreset } from 'livekit-client'
-import type { LocalParticipant } from 'livekit-client'
+import type { LocalParticipant, LocalTrackPublication } from 'livekit-client'
 // no-inline: arquivo de verdade (data: URLs são bloqueadas pela CSP das janelas).
 import workletUrl from './pcm-player.worklet.js?url&no-inline'
 
@@ -68,7 +68,43 @@ function nextAudioPort(timeoutMs = 3000): Promise<MessagePort> {
 export interface ActiveShare {
   /** Resultado do som: ligado, desligado por escolha, ou falhou (com o motivo). */
   audio: { state: 'on' } | { state: 'off' } | { state: 'failed'; reason: string }
+  codec: 'h264' | 'vp8'
+  preset: StreamQualityPreset
+  publication: LocalTrackPublication
+  /** Troca a qualidade sem parar a transmissão (nem escolher a fonte de novo). */
+  retune(preset: StreamQualityPreset): Promise<void>
   stop(): Promise<void>
+}
+
+/**
+ * H.264 pela placa de vídeo quando o PC tiver (o navegador diz se é "eficiente" = hardware);
+ * senão VP8, que o processador faz bem. Comprimir 1080p60 no processador, com um jogo aberto,
+ * é uma das causas de transmissão travando.
+ */
+export async function chooseCodec(
+  wanted: ShareCodec | undefined,
+  preset: StreamQualityPreset,
+): Promise<'h264' | 'vp8'> {
+  if (wanted === 'h264' || wanted === 'vp8') return wanted
+  const p = presets[preset]
+  try {
+    const info = await navigator.mediaCapabilities.encodingInfo({
+      type: 'webrtc',
+      video: {
+        contentType: 'video/H264',
+        width: p.width,
+        height: p.height,
+        bitrate: p.encoding.encoding.maxBitrate,
+        framerate: p.fps,
+      },
+    })
+    console.info(
+      `[call] H.264 ${p.width}x${p.height}@${p.fps}: suportado=${info.supported} hardware=${info.powerEfficient}`,
+    )
+    return info.supported && info.powerEfficient ? 'h264' : 'vp8'
+  } catch {
+    return 'vp8'
+  }
 }
 
 /**
@@ -81,6 +117,7 @@ export async function startScreenShare(
   onEnded: () => void,
 ): Promise<ActiveShare> {
   const preset = presets[request.preset]
+  const codec = await chooseCodec(request.codec, request.preset)
 
   // O main entrega a fonte escolhida no seletor (setDisplayMediaRequestHandler).
   const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -100,9 +137,11 @@ export async function startScreenShare(
     `[call] captura ${captured.width}x${captured.height} a ${Math.round(captured.frameRate ?? 0)} fps (pedido: ${preset.fps})`,
   )
 
-  await participant.publishTrack(videoTrack, {
+  const publication = await participant.publishTrack(videoTrack, {
     name: 'screen',
     source: Track.Source.ScreenShare,
+    videoCodec: codec,
+    // A camada de 360p só é codificada enquanto alguém precisar dela (dynacast).
     simulcast: true,
     screenShareEncoding: preset.encoding.encoding,
     screenShareSimulcastLayers: [ScreenSharePresets.h360fps15],
@@ -181,5 +220,54 @@ export async function startScreenShare(
   }
   videoTrack.addEventListener('ended', handleEnded)
 
-  return { audio, stop }
+  let current = request.preset
+  const retune = async (next: StreamQualityPreset) => {
+    if (stopped || next === current) return
+    const target = presets[next]
+    // Captura: resolução e fps novos.
+    await videoTrack
+      .applyConstraints({
+        width: { ideal: target.width },
+        height: { ideal: target.height },
+        frameRate: { ideal: target.fps, max: target.fps },
+      })
+      .catch((error) => console.warn('[call] não consegui mudar a captura', error))
+    // Codificação: a camada mais alta ganha o novo teto de banda e de fps.
+    const sender = publication.track?.sender
+    if (sender) {
+      const params = sender.getParameters()
+      const top = params.encodings.reduce<RTCRtpEncodingParameters | undefined>(
+        (best, e) => (!best || (e.maxBitrate ?? 0) > (best.maxBitrate ?? 0) ? e : best),
+        undefined,
+      )
+      if (top) {
+        top.maxBitrate = target.encoding.encoding.maxBitrate
+        top.maxFramerate = target.fps
+      }
+      // A camada de 360p foi calculada a partir da resolução antiga: refaz a escala para
+      // continuar em ~360p (senão, de 1080p para 720p, ela cairia para 240p).
+      for (const encoding of params.encodings) {
+        if (encoding === top || (encoding.scaleResolutionDownBy ?? 1) <= 1) continue
+        encoding.scaleResolutionDownBy = Math.max(1, target.height / 360)
+      }
+      params.degradationPreference = target.fps >= 60 ? 'maintain-framerate' : 'balanced'
+      await sender.setParameters(params).catch((error) => {
+        console.warn('[call] não consegui mudar a codificação', error)
+      })
+    }
+    videoTrack.contentHint = target.hint
+    current = next
+    active.preset = next
+    console.info(`[call] qualidade trocada para ${next}`)
+  }
+
+  const active: ActiveShare = {
+    audio,
+    codec,
+    preset: request.preset,
+    publication,
+    retune,
+    stop,
+  }
+  return active
 }

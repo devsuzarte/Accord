@@ -43,6 +43,7 @@ import { channelLabel, useT } from '../shared/i18n'
 import { readJson, readString, write } from '../shared/storage'
 import { AudioSettings } from './AudioSettings'
 import { InviteCard, useInvite } from './InviteCard'
+import { BandwidthTable, FirewallRow, NetworkTest, ShareHealth } from './StreamHealth'
 import { CopyInviteButton } from '../shared/CopyInviteButton'
 import { inviteFor, sortAddresses } from '../shared/invites'
 
@@ -170,6 +171,11 @@ function CurrentChannel({ call }: { call: CallSnapshot }) {
         </ul>
       </div>
       {call.error && <p className="notice notice--warn">{call.error}</p>}
+      <ShareHealth call={call} />
+      <NetworkTest
+        call={call}
+        isHost={call.participants.some((p) => p.isLocal && p.role === 'owner')}
+      />
       <CopyInviteButton server={call.server} className="action" />
       <button
         type="button"
@@ -639,7 +645,12 @@ function HostSection({ call, profile, onEditProfile }: ChannelsTabProps) {
           {starting ? <Loader size={16} className="spin" /> : <Server size={16} />}
           {starting ? t('host.starting') : t('host.start')}
         </button>
-        <p className="hint hint--flush">{t('host.firewall')}</p>
+        {host.firewall === 'unsupported' ? (
+          <p className="hint hint--flush">{t('host.firewall')}</p>
+        ) : (
+          <FirewallRow host={host} />
+        )}
+        <BandwidthTable />
       </>
     )
   }
@@ -685,6 +696,9 @@ function HostSection({ call, profile, onEditProfile }: ChannelsTabProps) {
           </div>
         )}
       </div>
+
+      {host.status === 'running' && <FirewallRow host={host} />}
+      <BandwidthTable />
 
       {!profile.name && <NeedName onEditProfile={onEditProfile} />}
       {!inCall && (

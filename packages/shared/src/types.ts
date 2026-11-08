@@ -96,6 +96,13 @@ export interface CallSnapshot {
   successor: string | null
   /** Modo aperte-para-falar ligado (`held` = segurando o atalho agora). */
   pushToTalk: { held: boolean } | null
+  /** Sua transmissão (só enquanto transmite). */
+  shareStats: ShareStats | null
+  /** Sugestão de baixar a qualidade, quando quem assiste está travando. */
+  shareAdvice: { preset: StreamQualityPreset; reason: 'viewers' | 'cpu' | 'bandwidth' } | null
+  speedTest: SpeedTestResult | null
+  /** Baixar a qualidade sozinho quando quem assiste estiver travando. */
+  shareAutoQuality: boolean
 }
 
 export interface CallServer {
@@ -111,6 +118,9 @@ export interface CallServer {
 export type CallCommand =
   | { type: 'join'; name: string; serverUrl: string; password?: string | null }
   | { type: 'ptt'; down: boolean }
+  | { type: 'retune-share'; preset: StreamQualityPreset }
+  | { type: 'auto-quality'; enabled: boolean }
+  | { type: 'speed-test' }
   | { type: 'leave' }
   | { type: 'toggle-mic' }
   | { type: 'toggle-deafen' }
@@ -151,6 +161,78 @@ export interface ShareRequest {
   kind: ShareKind
   preset: StreamQualityPreset
   audio: boolean
+  /** Quem comprime o vídeo. `auto` = placa de vídeo (H.264) quando o PC tiver, senão VP8. */
+  codec?: ShareCodec
+}
+
+export type ShareCodec = 'auto' | 'h264' | 'vp8'
+
+/**
+ * Banda que cada qualidade usa (Mbps, camada alta + a de 360p). Quem hospeda manda uma cópia
+ * para cada pessoa assistindo: é a conta que mais pesa na estabilidade.
+ */
+export const PRESET_MBPS: Record<StreamQualityPreset, number> = {
+  balanced: 2.4,
+  smooth: 4.4,
+  motion: 5.4,
+  fluid: 8.4,
+}
+
+/** Qualidade um degrau abaixo (para quando a transmissão está travando). */
+export const PRESET_LOWER: Record<StreamQualityPreset, StreamQualityPreset | null> = {
+  fluid: 'smooth',
+  motion: 'balanced',
+  smooth: 'balanced',
+  balanced: null,
+}
+
+/** O que a pessoa que transmite vê sobre a própria transmissão. */
+export interface ShareStats {
+  width: number
+  height: number
+  fps: number
+  /** Megabits por segundo saindo agora (todas as camadas). */
+  mbps: number
+  codec: string
+  /** hardware = placa de vídeo; software = processador. */
+  encoder: 'hardware' | 'software' | 'unknown'
+  encoderName: string
+  /** O que está segurando a qualidade agora (o próprio navegador diz). */
+  limit: 'none' | 'cpu' | 'bandwidth' | 'other'
+  /** UDP é o normal; TCP = a porta UDP está bloqueada e a imagem trava mais. */
+  transport: 'udp' | 'tcp' | 'unknown'
+  rttMs: number | null
+  viewers: ViewerReportSummary
+}
+
+export interface ViewerReportSummary {
+  count: number
+  good: number
+  fair: number
+  bad: number
+  /** Nome de quem está com problema e o motivo principal. */
+  struggling: { name: string; diagnosis: string }[]
+}
+
+/** Relatório que cada janela de assistir manda, pelo servidor, a quem transmite. */
+export interface StreamReport {
+  type: 'report'
+  target: string
+  viewer: string
+  from: string
+  level: 'good' | 'fair' | 'bad'
+  diagnosis: string
+  fps: number
+  height: number
+}
+
+export interface SpeedTestResult {
+  state: 'running' | 'done' | 'failed'
+  /** Do host até você. */
+  downMbps?: number
+  /** De você até o host (o que conta para transmitir quando você não é o host). */
+  upMbps?: number
+  rttMs?: number
 }
 
 export type ShareAudioResult = { ok: true } | { ok: false; reason: string }
@@ -159,6 +241,9 @@ export type ShareAudioResult = { ok: true } | { ok: false; reason: string }
 export interface ShareState {
   sourceName: string
   kind: ShareKind
+  preset: StreamQualityPreset
+  /** Codec que está sendo usado de fato (`h264` ou `vp8`). */
+  codec: 'h264' | 'vp8'
   /** on: transmitindo som · off: escolheu sem som · failed: tentou e não deu. */
   audio: 'on' | 'off' | 'failed'
 }
@@ -278,6 +363,8 @@ export interface HostState {
   locked: boolean
   /** Chave de convite do canal aberto aqui (só com senha). */
   invite: string | null
+  /** Firewall do Windows: as portas do Accord estão liberadas? */
+  firewall: 'ok' | 'missing' | 'unknown' | 'unsupported'
 }
 
 /** Parar de hospedar: encerrar para todos ou passar a sessão para o próximo da fila. */
@@ -321,6 +408,8 @@ export const CHAT_MAX_ATTACHMENTS = 4
 export const SESSION_TOPIC = 'accord.session'
 /** Marcadores na tela de quem transmite (o servidor confere quem mandou). */
 export const POINTER_TOPIC = 'accord.pointer'
+/** Relatórios de quem assiste para quem transmite (o servidor confere quem mandou). */
+export const STREAM_REPORT_TOPIC = 'accord.stream-report'
 /** O app de quem hospeda se identifica para o próprio servidor (papel de dono, trocar senha). */
 export const HOST_KEY_HEADER = 'x-accord-host-key'
 /**

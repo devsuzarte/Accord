@@ -1517,3 +1517,92 @@ kbd[data-broken] {
   gap: 4px;
   color: var(--text-muted);
 }
+
+/* ── Saúde da transmissão e da rede ──────────────────── */
+
+.health {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: var(--material-raised);
+}
+
+.health__grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.health__grid dt {
+  color: var(--text-muted);
+}
+
+.health__grid dd {
+  margin: 0;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.health__grid dd[data-warn] {
+  color: color-mix(in srgb, var(--status-yellow) 55%, var(--text-strong));
+}
+
+.band {
+  font-size: var(--font-size-sm);
+}
+
+.band__summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.band__summary:hover {
+  color: var(--text-strong);
+}
+
+.band[open] .band__summary {
+  margin-bottom: 6px;
+}
+
+.band__table {
+  width: 100%;
+  margin: 6px 0;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.band__table th,
+.band__table td {
+  padding: 4px 4px;
+  text-align: right;
+  border-bottom: 1px solid var(--material-border);
+}
+
+.band__table th[scope='row'],
+.band__table thead th:first-child {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.band__table thead th {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.band__table .band__group {
+  text-align: right;
+  font-size: var(--font-size-xs);
+}
+
+.band__detail {
+  display: block;
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}

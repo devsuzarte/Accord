@@ -36,6 +36,8 @@ export interface StreamStats {
   freezes: number
   freezeSeconds: number
   codec: string
+  /** UDP é o normal; TCP = UDP bloqueado no caminho (trava mais com perda). */
+  route: 'udp' | 'tcp' | 'unknown'
   streamer: ConnectionQuality
   level: QualityLevel
   diagnosis: Diagnosis
@@ -114,6 +116,8 @@ export function useStreamQuality(
       if (stopped || !report) return
       let inbound: Record<string, number | string | undefined> | null = null
       let rtt: number | null = null
+      let localCandidate = ''
+      const candidates = new Map<string, string>()
       const codecs = new Map<string, string>()
       report.forEach((entry: Record<string, unknown>) => {
         if (entry.type === 'inbound-rtp' && entry.kind === 'video') {
@@ -122,6 +126,9 @@ export function useStreamQuality(
         if (entry.type === 'codec' && typeof entry.mimeType === 'string') {
           codecs.set(String(entry.id), entry.mimeType.replace(/^video\//i, ''))
         }
+        if (entry.type === 'local-candidate') {
+          candidates.set(String(entry.id), String(entry.relayProtocol ?? entry.protocol ?? ''))
+        }
         if (
           entry.type === 'candidate-pair' &&
           entry.state === 'succeeded' &&
@@ -129,12 +136,16 @@ export function useStreamQuality(
           (entry.nominated === true || rtt === null)
         ) {
           rtt = entry.currentRoundTripTime * 1000
+          localCandidate = String(entry.localCandidateId ?? '')
         }
       })
       if (!inbound) return
       const rtp = inbound as Record<string, number | string | undefined>
       const num = (key: string) => (typeof rtp[key] === 'number' ? (rtp[key] as number) : 0)
       const codec = codecs.get(String(rtp.codecId)) ?? ''
+      const protocol = candidates.get(localCandidate) ?? ''
+      const route: StreamStats['route'] =
+        protocol === 'udp' ? 'udp' : protocol === 'tcp' || protocol === 'tls' ? 'tcp' : 'unknown'
 
       const now = performance.now()
       samples.push({
@@ -199,6 +210,7 @@ export function useStreamQuality(
         freezes,
         freezeSeconds: num('totalFreezesDuration'),
         codec,
+        route,
         streamer: streamerQuality.current,
         level,
         diagnosis,

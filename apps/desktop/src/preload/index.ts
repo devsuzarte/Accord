@@ -111,6 +111,7 @@ const platform: PlatformBridge = {
     setPassword: (password) => ipcRenderer.invoke(IpcChannel.HostSetPassword, password),
     stop: (mode) => ipcRenderer.send(IpcChannel.HostStop, mode ?? 'end'),
     rotateInvite: () => ipcRenderer.invoke(IpcChannel.HostRotateInvite),
+    allowFirewall: () => ipcRenderer.invoke(IpcChannel.HostAllowFirewall),
     onChange: (listener) => subscribe<HostState>(IpcChannel.HostStateChanged, listener),
   },
   update: {

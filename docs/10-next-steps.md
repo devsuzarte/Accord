@@ -202,6 +202,36 @@ No accounts yet: everyone types a name and joins the "General" channel. It's a d
 
 ---
 
+## M12 — Stream stability (M) · ✅ implemented (2026-11-08)
+
+> Why streams freeze, in order: the host's upload multiplied by viewers, software encoding (VP8 on the CPU) while a game runs, UDP blocked (falls back to TCP), relayed VPN routes, and nobody knowing which of these it is. M12 makes each one visible and gives a one-click fix. The long-term fix (a server in a data center) is planned in [15](15-cloud-server.md).
+>
+> Tested with two instances on Linux (OpenH264/libvpx, no GPU): **Automatic** picked VP8 (no hardware encoder), forcing **H.264** sent 1920×1080 with OpenH264; the card showed resolution, fps, Mbps, encoder, UDP and the viewer's report ("1 fine"). Changing **1080p30 → 720p30 while live** went from 1920×1080 to 1280×720 without re-picking the screen; the 360p layer stays at 360p. Speed test: ↓ ~900 / ↑ ~120 Mbps on loopback, second run within 20 s → refused (rate limit).
+
+| # | What | Where |
+|---|---|---|
+| 12.1 | **"Your stream" card** (Channels tab, while streaming): what is going out (resolution, fps, Mbps), codec and **who encodes** (graphics card or processor, from `powerEfficientEncoder`/`encoderImplementation`), **what limits it** (`qualityLimitationReason`: CPU or bandwidth), UDP or TCP, round trip, and how viewers are doing. A warning on the pill when it's struggling | `pill/call/shareMonitor.ts`, `panel/StreamHealth.tsx`, `pill/Pill.tsx` |
+| 12.2 | **Encode with**: Automatic / Graphics card (H.264) / Processor (VP8) in the picker. Automatic asks `navigator.mediaCapabilities.encodingInfo({ type: 'webrtc' })` and uses H.264 only when `powerEfficient` (hardware) | `picker/Picker.tsx`, `pill/call/screenShare.ts` (`chooseCodec`) |
+| 12.3 | **Change quality without stopping**: `applyConstraints` on the capture + `RTCRtpSender.setParameters` (top layer bitrate/fps; the 360p layer is rescaled) | `screenShare.ts` (`retune`), `CallCommand retune-share` |
+| 12.4 | **Viewers report to the streamer**: every 4 s the viewer sends its level and diagnosis to `POST /stream-report`; the server forwards only to the streamer (`destinationIdentities`, name from the token, 1 report / 3 s). Reports expire after 12 s | `routes/stream.ts`, `viewer/Viewer.tsx`, topic `accord.stream-report` |
+| 12.5 | **Suggestion and Automatic quality**: 8 s of CPU limit, bandwidth limit or most viewers freezing on the streamer's side → "Lower to {preset}?". With Automatic quality on, it lowers by itself (at most every 30 s, never raises) | `shareMonitor.ts`, `PRESET_LOWER` |
+| 12.6 | **Network test to the host**: downloads 8 MB (`GET /speedtest`) and uploads 4 MB (`POST /speedtest`); says which quality fits your upload. One test per 20 s per person | `callStore.ts` (`runSpeedTest`), `routes/stream.ts` |
+| 12.7 | **Windows firewall in one click** (Host tab): checks the rules and creates them with an elevation prompt, only for private ranges and VPNs (10/8, 172.16/12, 192.168/16, 100.64/10, 25/8, 26/8) | `main/network/firewall.ts`, `host-service.ts` |
+| 12.8 | **Upload table for hosts** (Host tab): Mbps per quality × people watching (`PRESET_MBPS`) | `panel/StreamHealth.tsx` |
+| 12.9 | **Route in the viewer**: UDP or TCP in the quality panel, with an explanation when TCP is making it freeze | `viewer/quality.ts`, `QualityPanel.tsx` |
+| 12.10 | **Direct routes first** in discovery: the same server found on the LAN and through Radmin/Tailscale shows the LAN address | `main/network/discovery.ts` |
+
+**Limits:** [Hypothesis] on Windows, H.264 through Media Foundation may be capped by the negotiated H.264 level at 1080p — if "Your stream" shows 1280×720 with Jogos e vídeo/Fluido and H.264, switch to VP8 or Automatic and report it. The speed test measures the path to the **host**; the host itself can't test its own upload (its friends' download is the host's upload to them).
+
+### To test on Windows (M12)
+- [ ] With an NVIDIA/AMD/Intel GPU: Automatic picks H.264 and the card says "graphics card"; CPU use drops compared with VP8
+- [ ] H.264 at 1080p30 and 1080p60: the card shows 1920×1080 (not capped at 720p)
+- [ ] With a heavy game open: the card shows "processor can't keep up" with VP8, and the suggestion appears; Automatic quality lowers it
+- [ ] Firewall "Allow": the elevation prompt appears once, the row turns green, a friend on the LAN joins
+- [ ] A friend runs the network test while you host
+
+---
+
 ## M3 — Accounts, channels and presence (L)
 
 **Result:** the panel stops being provisional: sign-up, login, photo, multiple channels and the list showing who is in each channel before joining.
@@ -278,4 +308,4 @@ The Spike S1 list ([09](09-overlay-study-opencluely.md#spike-s1-checklist-derive
 
 ## Outside these milestones (backlog)
 
-Camera, multiple servers per account, macOS/Linux, cloud ([02](02-architecture.md#migrating-to-a-scalable-server)).
+Camera, multiple servers per account, macOS/Linux. Cloud hosting: plan in [15](15-cloud-server.md) (and [02](02-architecture.md#migrating-to-a-scalable-server) for scaling beyond one VM).
