@@ -122,6 +122,17 @@ export type IpcChannel = (typeof IpcChannel)[keyof typeof IpcChannel]
 /** Marca da mensagem `window.postMessage` que entrega o MessagePort do som da transmissão. */
 export const SHARE_AUDIO_PORT_MESSAGE = 'sharescreen:share-audio-port'
 
+/**
+ * Aviso do main pelo mesmo MessagePort do som (no meio dos pedaços de PCM): o som do app
+ * parou de chegar, voltou, ou a captura não volta mais. Ver docs/16 P4.
+ */
+export const SHARE_AUDIO_STATUS = 'sharescreen:share-audio-status'
+export interface ShareAudioStatus {
+  type: typeof SHARE_AUDIO_STATUS
+  state: 'flowing' | 'quiet' | 'failed'
+  reason?: string
+}
+
 export interface AppInfo {
   name: string
   version: string

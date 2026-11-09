@@ -1,5 +1,10 @@
-import { SHARE_AUDIO_PORT_MESSAGE } from '@sharescreen/shared'
-import type { ShareCodec, ShareRequest, StreamQualityPreset } from '@sharescreen/shared'
+import { SHARE_AUDIO_PORT_MESSAGE, SHARE_AUDIO_STATUS } from '@sharescreen/shared'
+import type {
+  ShareAudioStatus,
+  ShareCodec,
+  ShareRequest,
+  StreamQualityPreset,
+} from '@sharescreen/shared'
 import { t } from '../../shared/i18n'
 import { AudioPresets, ScreenSharePresets, Track, VideoPreset } from 'livekit-client'
 import type { LocalParticipant, LocalTrackPublication } from 'livekit-client'
@@ -115,6 +120,7 @@ export async function startScreenShare(
   participant: LocalParticipant,
   request: ShareRequest,
   onEnded: () => void,
+  onAudioStatus?: (status: ShareAudioStatus) => void,
 ): Promise<ActiveShare> {
   const preset = presets[request.preset]
   const codec = await chooseCodec(request.codec, request.preset)
@@ -175,7 +181,15 @@ export async function startScreenShare(
       })
       const destination = audioContext.createMediaStreamDestination()
       player.connect(destination)
-      port.onmessage = (event) => player.port.postMessage(event.data)
+      port.onmessage = (event) => {
+        const data = event.data as ShareAudioStatus | Uint8Array
+        // No meio do PCM, o main manda avisos (som parou / voltou / captura não volta).
+        if (!ArrayBuffer.isView(data) && data?.type === SHARE_AUDIO_STATUS) {
+          onAudioStatus?.(data)
+          return
+        }
+        player.port.postMessage(data)
+      }
       await audioContext.resume()
 
       audioTrack = destination.stream.getAudioTracks()[0] ?? null

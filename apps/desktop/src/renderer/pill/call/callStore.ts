@@ -981,14 +981,32 @@ export const useCallStore = create<CallStore>((set, get) => {
         `compartilhando ${request.kind} "${request.sourceName}" (${request.preset}, som: ${request.audio})`,
       )
       try {
-        activeShare = await startScreenShare(r.localParticipant, request, () => {
-          // A fonte acabou sozinha (ex.: a janela compartilhada fechou).
-          stopMonitor()
-          activeShare = null
-          sound('share-stop')
-          set({ sharing: null })
-          refresh()
-        })
+        activeShare = await startScreenShare(
+          r.localParticipant,
+          request,
+          () => {
+            // A fonte acabou sozinha (ex.: a janela compartilhada fechou).
+            stopMonitor()
+            activeShare = null
+            sound('share-stop')
+            set({ sharing: null })
+            refresh()
+          },
+          (status) => {
+            // O main avisa quando o som do app para de chegar, volta, ou não volta mais.
+            const sharing = get().sharing
+            if (!sharing || sharing.audio === 'off') return
+            log(`som da transmissão: ${status.state}${status.reason ? ` (${status.reason})` : ''}`)
+            if (status.state === 'failed') {
+              set({
+                sharing: { ...sharing, audio: 'failed' },
+                error: t('call.notice.noAudio', { reason: status.reason ?? t('call.err.unknown') }),
+              })
+              return
+            }
+            set({ sharing: { ...sharing, audio: status.state === 'quiet' ? 'quiet' : 'on' } })
+          },
+        )
         sound('share-start')
         const share = activeShare
         const audio = share.audio

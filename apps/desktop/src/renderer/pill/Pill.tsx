@@ -276,9 +276,14 @@ export function Pill() {
                     {t(`pill.shareTrouble.${call.shareTrouble}`)}
                   </button>
                 ) : (
-                  call.sharing?.audio === 'failed' && (
+                  (call.sharing?.audio === 'failed' && (
                     <p className="pill__notice">{t('pill.streamingNoAudio')}</p>
-                  )
+                  )) ||
+                  (call.sharing?.audio === 'quiet' && (
+                    <p className="pill__notice" title={t('pill.streamingQuietHint')}>
+                      {t('pill.streamingQuiet')}
+                    </p>
+                  ))
                 )}
 
                 {call.status === 'reconnecting' && (

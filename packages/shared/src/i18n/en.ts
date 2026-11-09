@@ -584,4 +584,7 @@ export const en: Messages = {
   'gpu.crashBody':
     'Click to restart Accord without hardware acceleration. You can turn it back on from the tray › Help.',
   'tray.hardwareAcceleration': 'Use hardware acceleration (restarts)',
+  'pill.streamingQuiet': 'No sound coming from the app',
+  'pill.streamingQuietHint':
+    'The app is silent or the capture stopped. Accord keeps trying to restart the capture on its own.',
 }

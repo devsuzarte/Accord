@@ -585,4 +585,7 @@ export const ptBR = {
   'gpu.crashBody':
     'Clique para reiniciar o Accord sem aceleração de hardware. Dá para religar pela bandeja › Ajuda.',
   'tray.hardwareAcceleration': 'Usar aceleração de hardware (reinicia)',
+  'pill.streamingQuiet': 'Nenhum som do app chegando',
+  'pill.streamingQuietHint':
+    'O app está em silêncio ou a captura parou. O Accord tenta religar a captura sozinho.',
 } as const
