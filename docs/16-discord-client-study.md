@@ -139,7 +139,84 @@ These came up in the comparison and need no work:
 
 ---
 
-## 5. How to repeat this study
+## 5. What was applied
+
+P1 to P7 are in the app. P8 is still only an idea and needs a product decision first.
+
+How it was tested: on Linux under Xvfb, with a local LiveKit 1.13.11 and the API, driving real Electron instances with Playwright (`_electron`). The packaged build (fuses on) was driven over the Chromium DevTools protocol, since `--inspect` is now off.
+
+### P1 — Pill recovery
+- `overlay-manager.ts` listens to `render-process-gone` on the pill and reloads it.
+- `call-recovery.ts` remembers the last `join` and keeps the panel on "reconnecting".
+  - When the reloaded pill sends its first snapshot, it asks it to join again.
+  - The server URL comes from the current snapshot, so a host migration is respected.
+- **[Decision]** It gives up after **2 crashes in 5 s** (like Discord) **or 3 in 2 min** (the rejoin itself takes seconds).
+  - On giving up, a notification and Tray › Help › "Reload the overlay" both try again.
+  - `killed` is treated like a crash, not as "quit": the app lives in the tray, so a dead pill is worse than a reload.
+- **[Decision]** The rejoin **reuses the same token** (kept in `sessionStorage`, which survives the renderer crash).
+  - LiveKit replaces a participant with the same identity, so the stale copy disappears at once. A fresh token left "Ana" twice in the room until LiveKit timed out the old one.
+  - The role (owner/admin) is kept.
+  - If the token no longer works (server restarted), the pill joins the normal way.
+- **[Observed in tests]**
+  - Crash mid-call → panel shows "reconnecting" → back in the call in under half a second. The other participant sees one "Ana".
+  - Crash while out of a call → it doesn't join anything.
+  - Two crashes in under 5 s → it gives up and leaves the call.
+  - The packaged build recovers the same way.
+- **Limit:** after giving up, the stale participant stays until LiveKit times it out (about 20 s), because there's no live renderer holding the token.
+
+### P2 — Electron fuses
+- Set in `electron-builder.yml`.
+- **[Observed in tests]** On the Linux build:
+  - `@electron/fuses read` shows them flipped.
+  - `ELECTRON_RUN_AS_NODE=1`, `NODE_OPTIONS=--require …` and `--inspect` are all ignored. The unfused Electron honors run-as-node, as a control.
+  - The packaged app joins a call, and RNNoise (wasm + worklet over `file://`) loads.
+- **[Hypothesis]** Two things still need one check on a Windows NSIS build, because Electron only enforces ASAR integrity on Windows and macOS:
+  - the ASAR integrity check itself;
+  - loading `loopback-capture`/`koffi` from `app.asar.unpacked`.
+
+### P3 — Helper process crashes
+- `process-watch.ts` logs every non-zero `child-process-gone` with type, reason and code.
+- **[Decision]** It offers to restart without hardware acceleration after **2 GPU crashes in 1 min**, not 3.
+  - **[Observed in tests]** On the 3rd GPU crash with no software fallback left, Chromium aborts the whole app ("GPU process isn't usable. Goodbye."), so a third crash would never reach our handler.
+  - [Hypothesis] On Windows with a real GPU, Chromium usually falls back to software first.
+- The choice is saved in `gpu.json` and applied before `ready`. Tray › Help › "Use hardware acceleration (restarts)" toggles it.
+- The diagnostics report says whether acceleration is on.
+- Unlike the proposal, the offer is a notification plus the tray item, not a hint in the panel.
+
+### P4 — Stream audio watchdog
+- **[Observed]** In `loopback-capture`'s Windows source:
+  - buffers below −70 dB are **never sent**, so silence produces no chunks;
+  - a capture error (`OnAudioSampleRequested` failing, for example on a device change) sets the state to `Error` and **stops for good without any callback**.
+  - From outside, silence and a dead capture look the same.
+- What main does now:
+  - restarts the capture after **10 s** without chunks, backing off to 1 min;
+  - if nothing arrives by **15 s**, sends `{ type: SHARE_AUDIO_STATUS }` through the same MessagePort as the PCM;
+  - the pill shows "No sound coming from the app" until chunks return. If a restart throws, the share audio becomes `failed` with the reason.
+- **[Observed in tests]** With `SHARESCREEN_FAKE_SHARE_AUDIO=stall` (a dead capture), the restart brings the sound back and the streamer never sees a warning. With `=mute` (a silent app), the warning appears at about 15 s and stays, and restarts space out 10 s → 20 s → 40 s.
+
+### P5 — Fake devices
+- `SHARESCREEN_FAKE_MEDIA=1` (dev builds only) turns on `use-fake-device-for-media-stream`.
+- **[Observed in tests]** Two instances join with a microphone and no error. The second one sees the first one speaking (the fake beep crosses the call), and RNNoise loads.
+
+### P6 — One switch for capture protection
+- `windows/content-protection.ts` is the only place that calls `setContentProtection`.
+- **Panel › Overlay › "Hide Accord from captures"** controls the pill, panel, chat and people list, and applies to windows created later. It's on by default and saved in `capture.json`.
+- These stay hidden always:
+  - the picker;
+  - the pointer markers;
+  - the mini viewer (so a stream never shows itself).
+- Only the panel can change the switch.
+- **[Observed in tests]** On Linux the switch is locked with an explanation (see P7). Setting it from the panel saves it, notifies every window and survives a restart. The pill can't change it.
+
+### P7 — Capabilities
+- `app.capabilities()` returns `shareAudio`, `captureExclusion` and `hardwareAcceleration`.
+- **[Decision]** Stream audio and capture exclusion both require Windows build **19041** (10 2004).
+  - Microsoft documents process loopback from build 20348, but it works from 19041; GStreamer made the same call.
+  - On older builds, stream audio now says so in the picker instead of failing when the share starts.
+
+---
+
+## 6. How to repeat this study
 
 ```bash
 npm install rea-agents@6.8.0 @electron/asar
@@ -157,5 +234,7 @@ Project facts from the saved evidence with `rea inspect-analysis-view` and a `ja
 ## Sources
 - [REA repository](https://github.com/morluto/rea) and its `docs/electron-fuses.md`, `docs/guides/javascript/javascript-application-workflows.md`
 - [electron-builder: adding Electron fuses (v26)](https://www.electron.build/v26/docs/tutorials/adding-electron-fuses)
+- [Microsoft: PROCESS_LOOPBACK_MODE](https://learn.microsoft.com/en-us/windows/win32/api/audioclientactivationparams/ne-audioclientactivationparams-process_loopback_mode) and [GStreamer wasapi2: process loopback on Windows 10](https://git.fasttube.de/FaSTTUBe/GST-Tensordecoder-ov_ep/commit/c98ad6f249f72db4eb6a2bca911f3c57808b197e)
+- `loopback-capture` 4.0.0 source (`src/platform/windows/LoopbackCapture.cpp`)
 - [Electron: fuses](https://electronjs.org/docs/latest/tutorial/fuses)
 - Discord desktop `1.0.9267` installed files (not redistributed)
