@@ -36,6 +36,14 @@ if (profile) {
 applyHardwareAccelerationChoice()
 watchChildProcesses()
 
+// Só em desenvolvimento: SHARESCREEN_FAKE_MEDIA=1 troca microfone e câmera por dispositivos
+// falsos do Chromium (um bipe e uma imagem de teste). Duas instâncias no mesmo PC deixam de
+// brigar pelo microfone, e dá para testar sem nenhum dispositivo (docs/16 P5).
+if (!app.isPackaged && process.env.SHARESCREEN_FAKE_MEDIA === '1') {
+  app.commandLine.appendSwitch('use-fake-device-for-media-stream')
+  console.info('[app] microfone e câmera falsos (SHARESCREEN_FAKE_MEDIA=1)')
+}
+
 // O áudio da chamada toca sem precisar de um clique antes (política de autoplay do Chromium).
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 
