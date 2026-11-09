@@ -28,6 +28,7 @@ import {
   secureWebPreferences,
 } from '../windows/common'
 import { NativeShareAudio, nativeAudioSupported } from './native-audio'
+import { protectWindow } from '../windows/content-protection'
 
 const PICKER_WIDTH = 760
 const PICKER_HEIGHT = 560
@@ -112,7 +113,7 @@ export class ShareService {
       webPreferences: secureWebPreferences(),
     })
     // O seletor não aparece na própria captura (nem na miniatura de "tela inteira").
-    picker.setContentProtection(true)
+    protectWindow(picker, { always: true })
     keepOnTop(picker)
     hardenNavigation(picker)
     picker.once('ready-to-show', () => {

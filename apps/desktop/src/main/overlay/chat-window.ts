@@ -12,6 +12,7 @@ import {
   secureWebPreferences,
 } from '../windows/common'
 import type { OverlayManager } from './overlay-manager'
+import { protectWindow } from '../windows/content-protection'
 
 const EXPANDED = { width: 420, height: 580 }
 const MINI_WIDTH = 332
@@ -111,7 +112,7 @@ export class ChatWindow {
       focusable: false,
       webPreferences: secureWebPreferences(),
     })
-    win.setContentProtection(true)
+    protectWindow(win)
     keepOnTop(win)
     preventMinimize(win)
     hardenNavigation(win)

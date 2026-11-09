@@ -9,6 +9,7 @@ import {
   overlaySurfaceOptions,
   secureWebPreferences,
 } from '../windows/common'
+import { protectWindow } from '../windows/content-protection'
 
 const HIDE_AFTER_MS = 3200
 
@@ -52,7 +53,7 @@ export class PointerWindow {
       webPreferences: secureWebPreferences(),
     })
     win.setIgnoreMouseEvents(true)
-    win.setContentProtection(true)
+    protectWindow(win, { always: true })
     keepOnTop(win)
     hardenNavigation(win)
     this.ready = false

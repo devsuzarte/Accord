@@ -2,7 +2,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import { IpcChannel, SHARE_AUDIO_PORT_MESSAGE } from '@sharescreen/shared'
-import type { ChatMode, ChatPrefs, Invite } from '@sharescreen/shared'
+import type { CaptureProtection, ChatMode, ChatPrefs, Invite } from '@sharescreen/shared'
 import type {
   CallCommand,
   CallSnapshot,
@@ -33,6 +33,13 @@ const platform: PlatformBridge = {
   app: {
     getInfo: () => ipcRenderer.invoke(IpcChannel.AppGetInfo),
     quit: () => ipcRenderer.send(IpcChannel.AppQuit),
+    capabilities: () => ipcRenderer.invoke(IpcChannel.AppGetCapabilities),
+  },
+  captureProtection: {
+    get: () => ipcRenderer.invoke(IpcChannel.CaptureProtectionGet),
+    set: (value) => ipcRenderer.send(IpcChannel.CaptureProtectionSet, value),
+    onChange: (listener) =>
+      subscribe<CaptureProtection>(IpcChannel.CaptureProtectionChanged, listener),
   },
   overlay: {
     resize: (size) => ipcRenderer.send(IpcChannel.OverlayResize, size),

@@ -1,7 +1,9 @@
 import type { LanguageSetting, LanguageState } from './i18n'
 import type { Invite } from './invite'
 import type {
+  AppCapabilities,
   AppInfo,
+  CaptureProtection,
   ChatMode,
   ChatPrefs,
   HotkeyInfo,
@@ -45,6 +47,13 @@ export interface PlatformBridge {
   app: {
     getInfo(): Promise<AppInfo>
     quit(): void
+    capabilities(): Promise<AppCapabilities>
+  }
+  /** Esconder as janelas do Accord das capturas (só o painel muda). */
+  captureProtection: {
+    get(): Promise<CaptureProtection>
+    set(value: CaptureProtection): void
+    onChange(listener: (value: CaptureProtection) => void): Unsubscribe
   }
   overlay: {
     /** Informa o tamanho do conteúdo do pill; a janela se ajusta a ele. */

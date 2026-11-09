@@ -12,6 +12,7 @@ import {
 } from '../windows/common'
 import { CrashGuard } from '../crash-guard'
 import { loadPosition, savePosition } from './position-store'
+import { protectWindow } from '../windows/content-protection'
 
 /**
  * O renderer do pill morreu. A chamada vive nele, então o main recarrega a página e
@@ -93,7 +94,7 @@ export class OverlayManager {
       }),
     })
 
-    pill.setContentProtection(true) // não aparece na própria transmissão (§2 item 8)
+    protectWindow(pill) // não aparece na própria transmissão (§2 item 8; docs/16 P6)
     keepOnTop(pill)
     preventMinimize(pill)
     hardenNavigation(pill)
@@ -316,7 +317,7 @@ export class OverlayManager {
       focusable: true,
       webPreferences: secureWebPreferences(),
     })
-    panel.setContentProtection(true)
+    protectWindow(panel)
     keepOnTop(panel)
     preventMinimize(panel)
     hardenNavigation(panel)

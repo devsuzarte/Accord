@@ -587,4 +587,9 @@ export const en: Messages = {
   'pill.streamingQuiet': 'No sound coming from the app',
   'pill.streamingQuietHint':
     'The app is silent or the capture stopped. Accord keeps trying to restart the capture on its own.',
+  'share.audio.windowsBuild': 'Stream audio needs Windows 10 version 2004 or newer.',
+  'overlay.hideTitle': 'Hide Accord from captures',
+  'overlay.hideText':
+    "The pill, panel, chat and people list don't show up when you stream or record your screen.",
+  'overlay.hideUnsupported': "This system can't hide windows from captures: they always show up.",
 }

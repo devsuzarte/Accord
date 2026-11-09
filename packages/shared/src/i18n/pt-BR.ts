@@ -588,4 +588,11 @@ export const ptBR = {
   'pill.streamingQuiet': 'Nenhum som do app chegando',
   'pill.streamingQuietHint':
     'O app está em silêncio ou a captura parou. O Accord tenta religar a captura sozinho.',
+  'share.audio.windowsBuild':
+    'O som da transmissão precisa do Windows 10 versão 2004 ou mais novo.',
+  'overlay.hideTitle': 'Esconder o Accord das capturas',
+  'overlay.hideText':
+    'Pill, painel, chat e lista de pessoas não aparecem quando você transmite ou grava a tela.',
+  'overlay.hideUnsupported':
+    'Este sistema não deixa esconder janelas das capturas: elas sempre aparecem.',
 } as const

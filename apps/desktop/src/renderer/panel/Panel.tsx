@@ -1,7 +1,14 @@
-import type { ChatPrefs, HotkeyInfo, OverlayCorner, PanelTab } from '@sharescreen/shared'
+import type {
+  AppCapabilities,
+  CaptureProtection,
+  ChatPrefs,
+  HotkeyInfo,
+  OverlayCorner,
+  PanelTab,
+} from '@sharescreen/shared'
 import { VoiceShortcuts } from './VoiceShortcuts'
 import { useReportSize } from '@sharescreen/ui'
-import { Ghost, MessageSquare, MousePointerClick, X } from 'lucide-react'
+import { EyeOff, Ghost, MessageSquare, MousePointerClick, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useOverlayState } from '../shared/useOverlayState'
 import { useCallSnapshot } from '../shared/useCallSnapshot'
@@ -149,6 +156,7 @@ function OverlayTab() {
         />
       </div>
 
+      <CaptureHideSwitch />
       <ChatOverlaySwitch />
       <PointerSwitch />
 
@@ -228,6 +236,46 @@ function PointerSwitch() {
         aria-label={t('overlay.pointerTitle')}
         className="switch"
         onClick={toggle}
+      />
+    </div>
+  )
+}
+
+/**
+ * Esconde pill, painel, chat e lista de pessoas das capturas de tela (docs/16 P6).
+ * Onde o sistema não deixa (Windows antes do 2004, Linux), a chave fica travada e explica.
+ */
+function CaptureHideSwitch() {
+  const t = useT()
+  const [value, setValue] = useState<CaptureProtection | null>(null)
+  const [caps, setCaps] = useState<AppCapabilities | null>(null)
+  useEffect(() => {
+    window.platform.captureProtection.get().then(setValue).catch(console.error)
+    window.platform.app.capabilities().then(setCaps).catch(console.error)
+    return window.platform.captureProtection.onChange(setValue)
+  }, [])
+  if (!value || !caps) return null
+  const supported = caps.captureExclusion
+  return (
+    <div className="row">
+      <div>
+        <p className="row__title">
+          <EyeOff size={15} /> {t('overlay.hideTitle')}
+        </p>
+        <p className="row__text">
+          {supported ? t('overlay.hideText') : t('overlay.hideUnsupported')}
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={supported && value.hideFromCaptures}
+        aria-label={t('overlay.hideTitle')}
+        className="switch"
+        disabled={!supported}
+        onClick={() =>
+          window.platform.captureProtection.set({ hideFromCaptures: !value.hideFromCaptures })
+        }
       />
     </div>
   )

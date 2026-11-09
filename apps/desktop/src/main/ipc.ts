@@ -30,6 +30,11 @@ import type { ShareService } from './share/share-service'
 import type { PointerWindow } from './overlay/pointer-window'
 import type { ViewerManager } from './share/viewer-manager'
 import type { OverlayManager } from './overlay/overlay-manager'
+import {
+  appCapabilities,
+  getCaptureProtection,
+  setCaptureProtection,
+} from './windows/content-protection'
 
 const corners: OverlayCorner[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
 const tabs: PanelTab[] = ['channels', 'overlay', 'you', 'appearance']
@@ -226,6 +231,16 @@ export function registerIpcHandlers({
     chrome: process.versions.chrome,
   }))
   ipcMain.on(IpcChannel.AppQuit, () => app.quit())
+  ipcMain.handle(IpcChannel.AppGetCapabilities, () => appCapabilities())
+
+  // Esconder as janelas do Accord das capturas: qualquer janela lê; só o painel muda.
+  ipcMain.handle(IpcChannel.CaptureProtectionGet, () => getCaptureProtection())
+  ipcMain.on(IpcChannel.CaptureProtectionSet, (event, value: unknown) => {
+    const v = value as { hideFromCaptures?: unknown }
+    if (fromPanel(event) && typeof v?.hideFromCaptures === 'boolean') {
+      setCaptureProtection({ hideFromCaptures: v.hideFromCaptures })
+    }
+  })
 
   ipcMain.on(IpcChannel.OverlayResize, (event, size: unknown) => {
     if (fromPill(event) && isSize(size)) overlay.resizePill(size)

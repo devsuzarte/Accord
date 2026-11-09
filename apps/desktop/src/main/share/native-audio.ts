@@ -3,6 +3,7 @@ import { app } from 'electron'
 import type Koffi from 'koffi'
 import type { MessageKey, ShareKind } from '@sharescreen/shared'
 import { tm } from '../i18n'
+import { windowsBuildAtLeast } from '../system'
 
 /**
  * Som da transmissão capturado no Windows pelo "process loopback" do WASAPI
@@ -80,6 +81,12 @@ function load(): void {
   }
   if (process.platform !== 'win32') {
     loadError = 'share.audio.windowsOnly'
+    return
+  }
+  // O "process loopback" do WASAPI: a Microsoft documenta o build 20348, mas funciona desde o
+  // Windows 10 2004 (19041), como o GStreamer também assume. Antes disso, nem tenta.
+  if (!windowsBuildAtLeast(19041)) {
+    loadError = 'share.audio.windowsBuild'
     return
   }
   try {
