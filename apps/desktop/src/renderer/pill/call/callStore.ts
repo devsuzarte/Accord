@@ -59,7 +59,7 @@ import type { SoundName } from './sounds'
  * (backgroundThrottling desligado) — docs/02-architecture.md › Renderer.
  */
 interface CallActions {
-  join(name: string, serverUrl: string, password?: string | null): Promise<void>
+  join(name: string, serverUrl: string, password?: string | null, resume?: boolean): Promise<void>
   leave(): Promise<void>
   toggleMic(): Promise<void>
   toggleDeafen(): Promise<void>
@@ -105,6 +105,33 @@ function readAutoQuality(): boolean {
 }
 /** Token da chamada: também identifica você nos pedidos de moderação. */
 let token = ''
+/**
+ * A sala em uso, guardada na sessionStorage (sobrevive ao recarregar o pill depois de um
+ * travamento). Ao voltar, o pill entra com o mesmo token: a mesma identidade substitui a
+ * "sombra" que ficou no LiveKit e mantém o papel (dono/admin). Ver docs/16 P1.
+ */
+const RESUME_KEY = 'sharescreen.call.resume'
+interface ResumeEntry {
+  base: string
+  name: string
+  access: JoinResponse
+}
+function saveResume(entry: ResumeEntry | null): void {
+  try {
+    if (entry) sessionStorage.setItem(RESUME_KEY, JSON.stringify(entry))
+    else sessionStorage.removeItem(RESUME_KEY)
+  } catch {
+    // Sem armazenamento: só não dá para reaproveitar a identidade.
+  }
+}
+function readResume(base: string, name: string): JoinResponse | null {
+  try {
+    const entry = JSON.parse(sessionStorage.getItem(RESUME_KEY) ?? 'null') as ResumeEntry | null
+    return entry && entry.base === base && entry.name === name ? entry.access : null
+  } catch {
+    return null
+  }
+}
 let mutes: LocalMutes = readLocalMutes()
 let volumes = readVolumes()
 /** Última foto enviada ao servidor (evita reenviar a mesma). */
@@ -458,6 +485,7 @@ export const useCallStore = create<CallStore>((set, get) => {
     endChat()
     lastMirror = ''
     window.platform.session.mirror(null)
+    saveResume(null)
     if (error) log(`saiu do canal: ${error}`)
     set({
       status: 'idle',
@@ -675,14 +703,32 @@ export const useCallStore = create<CallStore>((set, get) => {
   })
 
   /** Entra num servidor (usado ao entrar e ao seguir o host novo na migração). */
-  const connect = async (name: string, joinUrl: string, joinPassword: string | null) => {
+  const connect = async (
+    name: string,
+    joinUrl: string,
+    joinPassword: string | null,
+    resume = false,
+  ) => {
     const base = joinUrl.replace(/\/$/, '')
     password = joinPassword?.trim() || null
     myName = name
-    log(`entrando em ${base}`)
+    log(`entrando em ${base}${resume ? ' (voltando depois de travar)' : ''}`)
+    const saved = resume ? readResume(base, name) : null
+    if (saved) {
+      try {
+        return await connectWith(name, base, saved)
+      } catch (error) {
+        // Token vencido ou servidor reiniciado: entra do jeito normal.
+        log(`não deu para voltar com a mesma identidade: ${error}`)
+      }
+    }
     const profile = await window.platform.profile.get().catch(() => null)
     const avatar = await uploadAvatar(profile?.avatar ?? null, base)
     const access = await requestToken(name, base, avatar)
+    return connectWith(name, base, access)
+  }
+
+  const connectWith = async (name: string, base: string, access: JoinResponse) => {
     const audio = get().audio
     const r = new Room({
       adaptiveStream: true,
@@ -708,6 +754,7 @@ export const useCallStore = create<CallStore>((set, get) => {
     serverUrl = base
     token = access.token
     leavingOnPurpose = false
+    saveResume({ base, name, access })
     r.remoteParticipants.forEach(subscribeVoices)
     if (audio.outputDeviceId) {
       await r.switchActiveDevice('audiooutput', audio.outputDeviceId).catch(() => undefined)
@@ -832,11 +879,11 @@ export const useCallStore = create<CallStore>((set, get) => {
     speedTest: null,
     shareAutoQuality: readAutoQuality(),
 
-    async join(name, joinUrl, joinPassword) {
+    async join(name, joinUrl, joinPassword, resume) {
       if (get().status !== 'idle') return
       set({ status: 'connecting', error: null })
       try {
-        await connect(name, joinUrl, joinPassword ?? null)
+        await connect(name, joinUrl, joinPassword ?? null, resume === true)
       } catch (error) {
         reset(error instanceof Error ? error.message : t('call.err.joinFailed'))
       }
@@ -1212,7 +1259,7 @@ export function startReportingCallState(): () => void {
     const store = useCallStore.getState()
     switch (command.type) {
       case 'join':
-        return void store.join(command.name, command.serverUrl, command.password)
+        return void store.join(command.name, command.serverUrl, command.password, command.resume)
       case 'leave':
         return void store.leave()
       case 'toggle-mic':

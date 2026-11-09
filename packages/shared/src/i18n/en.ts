@@ -575,4 +575,9 @@ export const en: Messages = {
   'viewer.quality.route.tcp': 'TCP (UDP blocked)',
   'viewer.diag.tcp':
     'The video is coming over TCP because the UDP port is blocked (on your PC or the host’s). With loss, the image freezes more.',
+  'recover.crashed': 'Accord crashed. Getting you back into the call…',
+  'recover.gaveUpTitle': 'Accord stopped responding',
+  'recover.gaveUpBody': 'It crashed several times in a row. Click to try again.',
+  'recover.gaveUp': 'Accord crashed several times in a row and left the call.',
+  'tray.reloadOverlay': 'Reload the overlay',
 }

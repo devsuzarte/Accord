@@ -90,7 +90,7 @@ if (!app.requestSingleInstanceLock()) {
     mirror = sessionMirror
     host = hostService
     const chat = new ChatWindow(overlay, (channel, payload) => overlay.sendToPill(channel, payload))
-    registerIpcHandlers({
+    const { retryPill } = registerIpcHandlers({
       overlay,
       hotkeys,
       share,
@@ -105,7 +105,7 @@ if (!app.requestSingleInstanceLock()) {
       mirror: sessionMirror,
       invites,
     })
-    const tray = createTray(overlay, profile, updater, () => viewers.unlockAll())
+    const tray = createTray(overlay, profile, updater, () => viewers.unlockAll(), retryPill)
     updater.onReady = tray.rebuild
     settings.onLanguageChange = tray.rebuild
     invites.register()

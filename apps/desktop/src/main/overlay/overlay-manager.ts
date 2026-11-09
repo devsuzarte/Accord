@@ -10,7 +10,16 @@ import {
   preventMinimize,
   secureWebPreferences,
 } from '../windows/common'
+import { CrashGuard } from '../crash-guard'
 import { loadPosition, savePosition } from './position-store'
+
+/**
+ * O renderer do pill morreu. A chamada vive nele, então o main recarrega a página e
+ * avisa quem precisa (o IPC volta a entrar no canal). Ver docs/16 §2.8 e P1.
+ */
+export type PillLifecycleEvent =
+  | { type: 'crashed'; reason: string; exitCode: number }
+  | { type: 'gave-up'; reason: string; exitCode: number }
 
 /** Distância (px) da borda que faz o pill "grudar" nela ao soltar. */
 const SNAP_DISTANCE = 24
@@ -50,6 +59,15 @@ export class OverlayManager {
   private readonly listeners = new Set<() => void>()
   /** Arrasto em andamento: distância do cursor até o canto do pill. */
   private dragOffset: { x: number; y: number } | null = null
+  /**
+   * Desiste de recarregar o pill se ele travar 2× em 5 s (como o Discord) ou 3× em 2 min
+   * (a nossa folga: entrar de novo na chamada leva alguns segundos e pode travar de novo).
+   */
+  private readonly pillCrashes = new CrashGuard([
+    { count: 2, withinMs: 5_000 },
+    { count: 3, withinMs: 120_000 },
+  ])
+  private readonly pillListeners = new Set<(event: PillLifecycleEvent) => void>()
 
   create(): void {
     this.pill = this.createPill()
@@ -93,8 +111,44 @@ export class OverlayManager {
       }, 150)
     })
     pill.webContents.on('did-finish-load', () => this.broadcastState())
+    pill.webContents.on('render-process-gone', (_event, details) => this.onPillGone(details))
     loadPage(pill, 'pill')
     return pill
+  }
+
+  /** Travou: recarrega a página (mesma janela, mesmo webContents) e avisa o resto do app. */
+  private onPillGone(details: Electron.RenderProcessGoneDetails): void {
+    // 'clean-exit' só acontece quando a janela está fechando de propósito.
+    if (details.reason === 'clean-exit' || this.pill.isDestroyed()) return
+    const event = { reason: details.reason, exitCode: details.exitCode }
+    if (!this.pillCrashes.record()) {
+      console.error(
+        `[overlay] o pill travou de novo (${details.reason}, código ${details.exitCode}); parei de recarregar`,
+      )
+      this.emitPill({ type: 'gave-up', ...event })
+      return
+    }
+    console.error(
+      `[overlay] o pill travou (${details.reason}, código ${details.exitCode}); recarregando`,
+    )
+    this.emitPill({ type: 'crashed', ...event })
+    this.pill.webContents.reload()
+  }
+
+  onPillLifecycle(listener: (event: PillLifecycleEvent) => void): () => void {
+    this.pillListeners.add(listener)
+    return () => this.pillListeners.delete(listener)
+  }
+
+  private emitPill(event: PillLifecycleEvent): void {
+    for (const listener of this.pillListeners) listener(event)
+  }
+
+  /** Depois de desistir: a pessoa pede pela bandeja para tentar de novo. */
+  reloadPill(): void {
+    if (this.pill.isDestroyed()) return
+    this.pillCrashes.reset()
+    this.pill.webContents.reload()
   }
 
   /** O renderer mediu o conteúdo: a janela vira exatamente esse tamanho (§1.1). */

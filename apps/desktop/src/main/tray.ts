@@ -13,6 +13,7 @@ export function createTray(
   profile?: string,
   updater?: Updater,
   unlockMini?: () => void,
+  reloadOverlay?: () => void,
 ): { tray: Tray; rebuild: () => void } {
   const tray = new Tray(nativeImage.createFromPath(trayIconPath))
   tray.setToolTip(profile ? `Accord (${profile})` : 'Accord')
@@ -58,6 +59,7 @@ export function createTray(
               },
             },
             { label: tm('tray.openLogs'), click: () => void shell.openPath(logDirectory()) },
+            ...(reloadOverlay ? [{ label: tm('tray.reloadOverlay'), click: reloadOverlay }] : []),
           ],
         },
         { type: 'separator' },

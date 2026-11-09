@@ -576,4 +576,9 @@ export const ptBR = {
   'viewer.quality.route.tcp': 'TCP (UDP bloqueado)',
   'viewer.diag.tcp':
     'O vídeo está vindo por TCP porque a porta UDP está bloqueada (no seu PC ou no de quem hospeda). Com perda, a imagem trava mais.',
+  'recover.crashed': 'O Accord travou. Voltando para a chamada…',
+  'recover.gaveUpTitle': 'O Accord parou de responder',
+  'recover.gaveUpBody': 'Ele travou várias vezes seguidas. Clique para tentar de novo.',
+  'recover.gaveUp': 'O Accord travou várias vezes seguidas e saiu da chamada.',
+  'tray.reloadOverlay': 'Recarregar o overlay',
 } as const

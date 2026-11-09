@@ -116,7 +116,14 @@ export interface CallServer {
 
 /** Comandos que o painel manda para o pill (via main). */
 export type CallCommand =
-  | { type: 'join'; name: string; serverUrl: string; password?: string | null }
+  | {
+      type: 'join'
+      name: string
+      serverUrl: string
+      password?: string | null
+      /** Só o main manda: volta depois de o pill travar, reusando a mesma identidade. */
+      resume?: boolean
+    }
   | { type: 'ptt'; down: boolean }
   | { type: 'retune-share'; preset: StreamQualityPreset }
   | { type: 'auto-quality'; enabled: boolean }
