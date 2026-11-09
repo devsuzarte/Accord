@@ -581,4 +581,8 @@ export const ptBR = {
   'recover.gaveUpBody': 'Ele travou várias vezes seguidas. Clique para tentar de novo.',
   'recover.gaveUp': 'O Accord travou várias vezes seguidas e saiu da chamada.',
   'tray.reloadOverlay': 'Recarregar o overlay',
+  'gpu.crashTitle': 'A placa de vídeo travou várias vezes',
+  'gpu.crashBody':
+    'Clique para reiniciar o Accord sem aceleração de hardware. Dá para religar pela bandeja › Ajuda.',
+  'tray.hardwareAcceleration': 'Usar aceleração de hardware (reinicia)',
 } as const

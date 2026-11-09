@@ -1,6 +1,7 @@
 import { app, clipboard, Menu, nativeImage, Notification, shell, Tray } from 'electron'
 import { tm } from './i18n'
 import { diagnosticReport, logDirectory } from './logger'
+import { hardwareAccelerationDisabled, restartWithHardwareAcceleration } from './process-watch'
 import trayIconPath from '../../resources/tray.png?asset'
 import type { OverlayManager } from './overlay/overlay-manager'
 import type { Updater } from './updater'
@@ -60,6 +61,13 @@ export function createTray(
             },
             { label: tm('tray.openLogs'), click: () => void shell.openPath(logDirectory()) },
             ...(reloadOverlay ? [{ label: tm('tray.reloadOverlay'), click: reloadOverlay }] : []),
+            {
+              label: tm('tray.hardwareAcceleration'),
+              type: 'checkbox',
+              checked: !hardwareAccelerationDisabled(),
+              // Só vale depois de reiniciar: o app reinicia na hora.
+              click: () => restartWithHardwareAcceleration(hardwareAccelerationDisabled()),
+            },
           ],
         },
         { type: 'separator' },

@@ -17,6 +17,7 @@ import { PointerWindow } from './overlay/pointer-window'
 import { ViewerManager } from './share/viewer-manager'
 import { createTray } from './tray'
 import { InviteService } from './invites'
+import { applyHardwareAccelerationChoice, watchChildProcesses } from './process-watch'
 import { Updater, updatesEnabled } from './updater'
 
 /**
@@ -30,6 +31,10 @@ const profile = process.argv
 if (profile) {
   app.setPath('userData', join(app.getPath('appData'), `Accord-${profile}`))
 }
+
+// GPU que trava sem parar: a pessoa pode ter escolhido rodar sem aceleração (docs/16 P3).
+applyHardwareAccelerationChoice()
+watchChildProcesses()
 
 // O áudio da chamada toca sem precisar de um clique antes (política de autoplay do Chromium).
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')

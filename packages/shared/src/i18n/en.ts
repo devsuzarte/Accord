@@ -580,4 +580,8 @@ export const en: Messages = {
   'recover.gaveUpBody': 'It crashed several times in a row. Click to try again.',
   'recover.gaveUp': 'Accord crashed several times in a row and left the call.',
   'tray.reloadOverlay': 'Reload the overlay',
+  'gpu.crashTitle': 'The graphics card crashed several times',
+  'gpu.crashBody':
+    'Click to restart Accord without hardware acceleration. You can turn it back on from the tray › Help.',
+  'tray.hardwareAcceleration': 'Use hardware acceleration (restarts)',
 }
