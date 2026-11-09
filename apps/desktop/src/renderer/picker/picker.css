@@ -180,6 +180,21 @@ body,
   font-weight: 600;
 }
 
+/* Trocar de tela: marca o que está no ar agora (mesmo selo do pill). */
+.source__live {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--status-red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
 /* ── Rodapé ──────────────────────────────────────────── */
 
 .picker__foot {
@@ -250,6 +265,12 @@ body,
   color: var(--text-strong);
   font: inherit;
   font-size: var(--font-size-sm);
+}
+
+/* Trocando de tela: o codec da transmissão não muda. */
+.encoder__select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .encoder__select:focus-visible {

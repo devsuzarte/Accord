@@ -592,4 +592,13 @@ export const en: Messages = {
   'overlay.hideText':
     "The pill, panel, chat and people list don't show up when you stream or record your screen.",
   'overlay.hideUnsupported': "This system can't hide windows from captures: they always show up.",
+  'call.err.shareSwitchFailed':
+    "Couldn't switch the stream (the current one is still live): {reason}",
+  'pill.shareSwitch': 'Switch screen or app',
+  'picker.switchTitle': "Switch what you're streaming",
+  'picker.switch': 'Switch',
+  'picker.current': 'Live',
+  'picker.codecLocked': "The encoder can't change in the middle of a stream.",
+  'health.switch': 'Switch screen or app',
+  'share.sourceGone': 'the screen or window you picked is no longer available',
 }

@@ -24,6 +24,7 @@ Desktop app for voice + screen sharing as an overlay, inspired by Discord. Full 
 - Open join: `POST /join { name, viewer? }` (room `geral`; `viewer: true` = hidden watch-only token, only for someone already in the call). `OPEN_JOIN=false` turns it off. Accounts (M3) postponed
 - Default API port: 7870 (`packages/shared/src/defaults.ts`; `normalizeServerUrl` adds the port)
 - Sharing: `src/main/share/` (picker, `setDisplayMediaRequestHandler`, native audio via loopback-capture + koffi, viewers). The pill receives voices only (`autoSubscribe: false`); the viewer has its own connection
+- Switching the source mid-stream: `CallCommand { type: 'switch-share' }` → pill `openSwitchPicker()` → `share.openPicker(ShareSwitchInfo)` (picker in switch mode) → `startShare` while sharing = `switchShare` → `ActiveShare.switchSource` (`replaceTrack` on the same publication; audio rebinds the native capture). Details in docs/02 › Switching the source
 - Stream audio: main → MessagePort (forwarded by the preload via `window.postMessage`) → `pcm-player.worklet.js` (import with `?url&no-inline`: the CSP blocks data:)
 - Testing without Windows: `SHARESCREEN_FAKE_SHARE_AUDIO=1` (440 Hz tone instead of native audio, dev only; `=stall` stops after 3 s per start like a dead capture, `=mute` stops for good like a silent app). `SHARESCREEN_FAKE_MEDIA=1` = Chromium fake mic/camera (dev only; use it with `dev:second`)
 - Packages: `bun run package:server` (the compiled API starts the neighboring LiveKit with generated keys) and `package:desktop` (NSIS). Logs in `app.getPath('logs')`

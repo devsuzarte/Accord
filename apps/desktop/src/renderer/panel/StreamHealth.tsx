@@ -1,6 +1,6 @@
 import { PRESET_MBPS } from '@sharescreen/shared'
 import type { CallSnapshot, HostState, StreamQualityPreset } from '@sharescreen/shared'
-import { Activity, Gauge, Loader, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { Activity, ArrowLeftRight, Gauge, Loader, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { useT } from '../shared/i18n'
 
 const presets: StreamQualityPreset[] = ['balanced', 'smooth', 'motion', 'fluid']
@@ -90,6 +90,14 @@ export function ShareHealth({ call }: { call: CallSnapshot }) {
           </button>
         </div>
       )}
+
+      <button
+        type="button"
+        className="action"
+        onClick={() => window.platform.call.command({ type: 'switch-share' })}
+      >
+        <ArrowLeftRight size={15} /> {t('health.switch')}
+      </button>
 
       <label className="field">
         <span className="field__label">{t('health.quality')}</span>

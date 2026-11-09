@@ -18,6 +18,7 @@ import type {
   ShareKind,
   ShareRequest,
   ShareSourceList,
+  ShareSwitchInfo,
 } from '@sharescreen/shared'
 import type { OverlayManager } from '../overlay/overlay-manager'
 import {
@@ -38,6 +39,8 @@ const AUDIO_RESTART_MS = 10_000
 const AUDIO_QUIET_MS = 15_000
 const AUDIO_RESTART_MAX_MS = 60_000
 const AUDIO_WATCH_MS = 2_000
+/** A escolha do seletor só vale para o getDisplayMedia que vier logo depois. */
+const PENDING_SOURCE_MS = 15_000
 
 /**
  * Compartilhamento de tela:
@@ -49,6 +52,10 @@ export class ShareService {
   private picker: BrowserWindow | null = null
   /** Fonte confirmada no seletor, aguardando o getDisplayMedia do pill. */
   private pendingSourceId: string | null = null
+  /** Quando a escolha pendente vence (o pill pode não pedir, ex.: trocou só a qualidade). */
+  private pendingUntil = 0
+  /** Seletor aberto para trocar a fonte de uma transmissão em andamento. */
+  private pickerSwitch: ShareSwitchInfo | null = null
   /** O que está sendo transmitido agora (para os marcadores saberem onde aparecer). */
   private activeSource: { id: string; displayId: string } | null = null
   private readonly audio = new NativeShareAudio()
@@ -67,7 +74,7 @@ export class ShareService {
     session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
       // Só a fonte que a pessoa escolheu no nosso seletor; e só para o pill.
       const requester = request.frame ? webContents.fromFrame(request.frame) : null
-      const sourceId = this.pendingSourceId
+      const sourceId = Date.now() <= this.pendingUntil ? this.pendingSourceId : null
       this.pendingSourceId = null
       if (!sourceId) {
         console.warn('[share] captura recusada: nenhuma fonte escolhida no seletor')
@@ -81,7 +88,12 @@ export class ShareService {
         return
       }
       try {
-        const sources = await desktopCapturer.getSources({ types: ['screen', 'window'] })
+        // Sem miniaturas: aqui só importa achar a fonte (gerar miniaturas de todas as janelas
+        // atrasava o começo e a troca da transmissão em alguns segundos).
+        const sources = await desktopCapturer.getSources({
+          types: ['screen', 'window'],
+          thumbnailSize: { width: 0, height: 0 },
+        })
         const source = sources.find((s) => s.id === sourceId)
         if (!source) console.warn(`[share] fonte ${sourceId} não existe mais (janela fechada?)`)
         else console.info(`[share] capturando "${source.name}"`)
@@ -96,8 +108,11 @@ export class ShareService {
 
   // ───────────────────────── Seletor ─────────────────────────
 
-  openPicker(): void {
+  openPicker(switching: ShareSwitchInfo | null = null): void {
+    this.pickerSwitch = switching
     if (this.picker && !this.picker.isDestroyed()) {
+      // Já aberto: recarrega a lista com o modo certo (começar ou trocar).
+      this.picker.webContents.send(IpcChannel.SharePickerMode, switching)
       this.picker.focus()
       return
     }
@@ -122,6 +137,7 @@ export class ShareService {
     })
     picker.on('closed', () => {
       this.picker = null
+      this.pickerSwitch = null
     })
     loadPage(picker, 'picker')
     this.picker = picker
@@ -155,6 +171,7 @@ export class ShareService {
     let screenNumber = 0
     return {
       audioSupported: nativeAudioSupported(),
+      switching: this.pickerSwitch,
       sources: sources
         .filter((s) => !ownIds.has(s.id))
         .filter((s) => s.id.startsWith('screen:') || !s.thumbnail.isEmpty())
@@ -175,6 +192,7 @@ export class ShareService {
 
   select(request: ShareRequest): void {
     this.pendingSourceId = request.sourceId
+    this.pendingUntil = Date.now() + PENDING_SOURCE_MS
     this.activeSource = { id: request.sourceId, displayId: '' }
     // Qual monitor é essa tela (para os marcadores aparecerem no monitor certo).
     if (request.sourceId.startsWith('screen:')) {

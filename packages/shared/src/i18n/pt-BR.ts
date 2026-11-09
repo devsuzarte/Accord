@@ -595,4 +595,13 @@ export const ptBR = {
     'Pill, painel, chat e lista de pessoas não aparecem quando você transmite ou grava a tela.',
   'overlay.hideUnsupported':
     'Este sistema não deixa esconder janelas das capturas: elas sempre aparecem.',
+  'call.err.shareSwitchFailed':
+    'Não consegui trocar a transmissão (a de antes continua no ar): {reason}',
+  'pill.shareSwitch': 'Trocar tela ou app',
+  'picker.switchTitle': 'Trocar o que você transmite',
+  'picker.switch': 'Trocar',
+  'picker.current': 'No ar',
+  'picker.codecLocked': 'O codificador não muda no meio da transmissão.',
+  'health.switch': 'Trocar tela ou app',
+  'share.sourceGone': 'a tela ou janela escolhida não está mais disponível',
 } as const

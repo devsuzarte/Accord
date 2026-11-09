@@ -126,6 +126,8 @@ export type CallCommand =
     }
   | { type: 'ptt'; down: boolean }
   | { type: 'retune-share'; preset: StreamQualityPreset }
+  /** Abre o seletor para trocar o que está sendo transmitido, sem parar a transmissão. */
+  | { type: 'switch-share' }
   | { type: 'auto-quality'; enabled: boolean }
   | { type: 'speed-test' }
   | { type: 'leave' }
@@ -159,6 +161,17 @@ export interface ShareSourceList {
   sources: ShareSource[]
   /** Se dá para transmitir o som (captura nativa disponível neste sistema). */
   audioSupported: boolean
+  /** Seletor aberto para trocar a fonte de uma transmissão em andamento. */
+  switching: ShareSwitchInfo | null
+}
+
+/** O que está no ar quando a pessoa abre o seletor para trocar de tela. */
+export interface ShareSwitchInfo {
+  sourceId: string
+  preset: StreamQualityPreset
+  audio: boolean
+  /** O codec não muda no meio da transmissão (precisaria publicar de novo). */
+  codec: 'h264' | 'vp8'
 }
 
 /** O que a pessoa escolheu no seletor. */
@@ -246,6 +259,7 @@ export type ShareAudioResult = { ok: true } | { ok: false; reason: string }
 
 /** Estado da sua transmissão, mostrado no pill. */
 export interface ShareState {
+  sourceId: string
   sourceName: string
   kind: ShareKind
   preset: StreamQualityPreset

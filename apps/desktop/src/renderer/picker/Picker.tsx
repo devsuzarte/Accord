@@ -3,6 +3,7 @@ import type {
   ShareCodec,
   ShareKind,
   ShareSource,
+  ShareSwitchInfo,
   StreamQualityPreset,
 } from '@sharescreen/shared'
 import { AppWindow, Monitor, X } from 'lucide-react'
@@ -70,10 +71,22 @@ export function Picker() {
   const [preset, setPreset] = useState<StreamQualityPreset>(readPreset)
   const [audio, setAudio] = useState(readAudio)
   const [codec, setCodec] = useState<ShareCodec>(readCodec)
+  /** Aberto durante uma transmissão: trocar a fonte em vez de começar outra. */
+  const [switching, setSwitching] = useState<ShareSwitchInfo | null>(null)
+
+  // Modo trocar: começa com a qualidade e o som que estão no ar (o codec não muda).
+  const enterMode = useCallback((info: ShareSwitchInfo | null) => {
+    setSwitching(info)
+    if (!info) return
+    setPreset(info.preset)
+    setAudio(info.audio)
+    setCodec(info.codec)
+  }, [])
 
   // Lista e atualiza as miniaturas enquanto o seletor está aberto.
   useEffect(() => {
     let alive = true
+    let first = true
     const load = () =>
       window.platform.share
         .listSources()
@@ -81,15 +94,23 @@ export function Picker() {
           if (!alive) return
           setSources(list.sources)
           setAudioSupported(list.audioSupported)
+          if (first) {
+            first = false
+            enterMode(list.switching)
+            const live = list.sources.find((s) => s.id === list.switching?.sourceId)
+            if (live) setTab(live.kind)
+          }
         })
         .catch(console.error)
     void load()
     const timer = setInterval(load, 3000)
+    const offMode = window.platform.share.onPickerMode(enterMode)
     return () => {
       alive = false
       clearInterval(timer)
+      offMode()
     }
-  }, [])
+  }, [enterMode])
 
   const visible = useMemo(() => (sources ?? []).filter((s) => s.kind === tab), [sources, tab])
   const selected = sources?.find((s) => s.id === selectedId) ?? null
@@ -101,9 +122,19 @@ export function Picker() {
   const start = useCallback(
     (source: ShareSource | null) => {
       if (!source) return
+      // Trocar para o que já está no ar, sem mudar nada: só fecha.
+      if (
+        switching &&
+        source.id === switching.sourceId &&
+        preset === switching.preset &&
+        (audio && audioSupported) === switching.audio
+      ) {
+        window.platform.share.cancel()
+        return
+      }
       remember(PRESET_KEY, preset)
       remember(AUDIO_KEY, audio ? '1' : '0')
-      remember(CODEC_KEY, codec)
+      if (!switching) remember(CODEC_KEY, codec)
       window.platform.share.select({
         sourceId: source.id,
         sourceName: source.name,
@@ -113,7 +144,7 @@ export function Picker() {
         codec,
       })
     },
-    [preset, audio, audioSupported, codec],
+    [preset, audio, audioSupported, codec, switching],
   )
 
   useEffect(() => {
@@ -133,9 +164,14 @@ export function Picker() {
 
   return (
     <div className="picker-frame">
-      <section className="picker app-backdrop" aria-label={t('picker.title')}>
+      <section
+        className="picker app-backdrop"
+        aria-label={switching ? t('picker.switchTitle') : t('picker.title')}
+      >
         <header className="picker__head">
-          <h1 className="picker__title">{t('picker.title')}</h1>
+          <h1 className="picker__title">
+            {switching ? t('picker.switchTitle') : t('picker.title')}
+          </h1>
           <button
             type="button"
             className="picker__close"
@@ -203,6 +239,9 @@ export function Picker() {
                   <AppWindow size={14} />
                 )}
                 <span className="source__name">{source.name}</span>
+                {source.id === switching?.sourceId && (
+                  <span className="source__live">{t('picker.current')}</span>
+                )}
               </span>
             </button>
           ))}
@@ -227,11 +266,15 @@ export function Picker() {
           </div>
 
           <div className="picker__actions">
-            <label className="encoder" title={t(`picker.codec.${codec}Hint`)}>
+            <label
+              className="encoder"
+              title={switching ? t('picker.codecLocked') : t(`picker.codec.${codec}Hint`)}
+            >
               <span className="sound__label">{t('picker.codec')}</span>
               <select
                 className="encoder__select"
                 value={codec}
+                disabled={!!switching}
                 onChange={(e) => setCodec(e.target.value as ShareCodec)}
               >
                 {codecs.map((id) => (
@@ -265,7 +308,7 @@ export function Picker() {
               disabled={!selected}
               onClick={() => start(selected)}
             >
-              {t('picker.start')}
+              {switching ? t('picker.switch') : t('picker.start')}
             </button>
           </div>
         </footer>

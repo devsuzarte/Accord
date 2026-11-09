@@ -13,6 +13,7 @@ import type {
   PlatformBridge,
   Profile,
   ShareRequest,
+  ShareSwitchInfo,
   Theme,
   UpdateState,
   ChatState,
@@ -71,8 +72,10 @@ const platform: PlatformBridge = {
     onState: (listener) => subscribe<CallSnapshot>(IpcChannel.CallStateChanged, listener),
   },
   share: {
-    openPicker: () => ipcRenderer.send(IpcChannel.ShareOpenPicker),
+    openPicker: (switching) => ipcRenderer.send(IpcChannel.ShareOpenPicker, switching ?? null),
     listSources: () => ipcRenderer.invoke(IpcChannel.ShareListSources),
+    onPickerMode: (listener) =>
+      subscribe<ShareSwitchInfo | null>(IpcChannel.SharePickerMode, listener),
     select: (request) => ipcRenderer.send(IpcChannel.ShareSelect, request),
     cancel: () => ipcRenderer.send(IpcChannel.ShareCancel),
     onStart: (listener) => subscribe<ShareRequest>(IpcChannel.ShareStart, listener),

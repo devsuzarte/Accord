@@ -66,6 +66,10 @@ interface CallActions {
   setInputDevice(deviceId: string): Promise<void>
   setOutputDevice(deviceId: string): Promise<void>
   startShare(request: ShareRequest): Promise<void>
+  /** Troca a fonte da transmissão em andamento (outra tela ou janela) sem parar. */
+  switchShare(request: ShareRequest): Promise<void>
+  /** Abre o seletor no modo "trocar", com o que está no ar marcado. */
+  openSwitchPicker(): void
   stopShare(): Promise<void>
   /** Abre a janela de viewer para assistir a quem está transmitindo. */
   watch(participant: ParticipantState): void
@@ -968,8 +972,10 @@ export const useCallStore = create<CallStore>((set, get) => {
     },
 
     async startShare(request) {
-      if (!room || activeShare) {
-        log(`compartilhar ignorado: ${!room ? 'sem chamada' : 'já transmitindo'}`)
+      // Já transmitindo: a escolha no seletor troca a fonte, sem parar a transmissão.
+      if (activeShare) return get().switchShare(request)
+      if (!room) {
+        log('compartilhar ignorado: sem chamada')
         return
       }
       const r = room
@@ -1026,6 +1032,7 @@ export const useCallStore = create<CallStore>((set, get) => {
         })
         set({
           sharing: {
+            sourceId: request.sourceId,
             sourceName: request.sourceName,
             kind: request.kind,
             preset: request.preset,
@@ -1051,6 +1058,63 @@ export const useCallStore = create<CallStore>((set, get) => {
         })
       }
       refresh()
+    },
+
+    async switchShare(request) {
+      const share = activeShare
+      const sharing = get().sharing
+      if (!share || !sharing || !room) return
+      if (request.audio && room.localParticipant.attributes.serverAudio === 'blocked') {
+        request = { ...request, audio: false }
+      }
+      log(
+        `trocando a transmissão para ${request.kind} "${request.sourceName}" (${request.preset}, som: ${request.audio})`,
+      )
+      try {
+        await share.switchSource(request)
+      } catch (error) {
+        // A transmissão de antes continua no ar; só a troca não deu.
+        console.error('[call] falha ao trocar a transmissão', error)
+        // O main só recusa a captura quando a fonte escolhida sumiu (janela fechada, monitor
+        // desligado) ou a escolha venceu; o Chromium devolve isso como um erro genérico.
+        const reason =
+          error instanceof DOMException
+            ? error.name === 'NotAllowedError'
+              ? t('call.err.shareDenied')
+              : t('share.sourceGone')
+            : error instanceof Error
+              ? error.message
+              : t('call.err.unknown')
+        set({ error: t('call.err.shareSwitchFailed', { reason }) })
+        return
+      }
+      if (activeShare !== share) return
+      const audio = share.audio
+      set({
+        sharing: {
+          ...sharing,
+          sourceId: request.sourceId,
+          sourceName: request.sourceName,
+          kind: request.kind,
+          preset: share.preset,
+          audio: audio.state,
+        },
+        shareAdvice: null,
+        error: audio.state === 'failed' ? t('call.notice.noAudio', { reason: audio.reason }) : null,
+      })
+      refresh()
+    },
+
+    openSwitchPicker() {
+      const share = activeShare
+      const sharing = get().sharing
+      if (!share || !sharing) return
+      window.platform.share.openPicker({
+        sourceId: sharing.sourceId,
+        preset: sharing.preset,
+        audio: sharing.audio !== 'off',
+        codec: share.codec,
+      })
     },
 
     async stopShare() {
@@ -1300,6 +1364,8 @@ export function startReportingCallState(): () => void {
         return store.localMute(command.name, command.kind, command.muted)
       case 'moderate':
         return void store.moderate(command.action, command.target)
+      case 'switch-share':
+        return void store.openSwitchPicker()
       case 'retune-share':
         return void store.retuneShare(command.preset)
       case 'auto-quality':
