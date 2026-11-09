@@ -13,6 +13,21 @@ files:
   - package.json
   - '!**/*.map'
 asar: true
+# Fuses do Electron: chaves gravadas no executável na hora de empacotar (docs/16 P2).
+# Fecham portas para rodar código alheio pelo nosso .exe (ELECTRON_RUN_AS_NODE, NODE_OPTIONS,
+# --inspect) e para trocar o código do app sem a gente saber (só carrega o app.asar, e
+# conferido). Conferir num build: npx @electron/fuses read --app <caminho do Accord.exe>
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  loadBrowserProcessSpecificV8Snapshot: false
+  # Fica ligada: as páginas carregam de file:// e buscam o worklet do som e o wasm do RNNoise
+  # também por file://. Desligar quebraria isso.
+  grantFileProtocolExtraPrivileges: true
 # Botão "Hospedar": o servidor (API compilada + LiveKit) vai junto, gerado por
 # `bun run package:server` (o `bun run package` da raiz faz os dois na ordem certa).
 extraResources:
