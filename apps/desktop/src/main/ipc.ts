@@ -99,7 +99,15 @@ function isCallCommand(value: unknown): value is CallCommand {
       v.volume <= 2
     )
   }
-  if (v.type === 'watch') return typeof v.identity === 'string' && v.identity.length < 128
+  if (v.type === 'watch') {
+    return (
+      typeof v.identity === 'string' &&
+      v.identity.length < 128 &&
+      (v.source === undefined || v.source === 'screen' || v.source === 'camera')
+    )
+  }
+  if (v.type === 'toggle-camera') return true
+  if (v.type === 'set-camera') return typeof v.deviceId === 'string' && v.deviceId.length < 512
   if (v.type === 'ptt') return typeof v.down === 'boolean'
   if (v.type === 'retune-share') {
     return presets.includes(v.preset)
@@ -129,6 +137,7 @@ const idleCall: CallSnapshot = {
     noiseSuppression: 'rnnoise',
     sounds: true,
   },
+  camera: { on: false, starting: false, deviceId: '', blocked: false },
   sharing: null,
   channelName: null,
   server: null,
@@ -188,7 +197,8 @@ function isViewerTarget(value: unknown): value is ViewerTarget {
     typeof v.serverUrl === 'string' &&
     /^https?:\/\//.test(v.serverUrl) &&
     typeof v.token === 'string' &&
-    v.token.length < 4096
+    v.token.length < 4096 &&
+    (v.source === undefined || v.source === 'screen' || v.source === 'camera')
   )
 }
 
@@ -214,6 +224,8 @@ const moderationActions = [
   'unmute-mic',
   'mute-audio',
   'unmute-audio',
+  'block-camera',
+  'unblock-camera',
   'kick',
   'make-admin',
   'remove-admin',

@@ -10,6 +10,8 @@ const actions: ModerationAction[] = [
   'unmute-mic',
   'mute-audio',
   'unmute-audio',
+  'block-camera',
+  'unblock-camera',
   'kick',
   'make-admin',
   'remove-admin',
@@ -25,7 +27,8 @@ function allowed(action: ModerationAction, role: ReturnType<typeof roleOf>): boo
  * Erros voltam como código (`ModerationError`); o app mostra a frase no idioma da pessoa.
  *
  * Moderação. Quem pede se identifica com o próprio token da chamada (Authorization: Bearer).
- * "Silenciar para todos" tira a permissão de publicar o microfone (ou o som da transmissão):
+ * "Silenciar para todos" tira a permissão de publicar o microfone (ou o som da transmissão, ou
+ * a câmera):
  * a pessoa não consegue reativar até o dono liberar — como o "silenciar no servidor" do Discord.
  */
 export const moderateRoutes = new Elysia().post(
@@ -51,11 +54,13 @@ export const moderateRoutes = new Elysia().post(
       return { error: 'forbidden' satisfies ModerationError }
     }
     const target = body.target
-    if (target === requester.identity && action !== 'unmute-mic' && action !== 'unmute-audio') {
+    const lifting =
+      action === 'unmute-mic' || action === 'unmute-audio' || action === 'unblock-camera'
+    if (target === requester.identity && !lifting) {
       set.status = 400
       return { error: 'not-self' satisfies ModerationError }
     }
-    if (roleOf(target) === 'owner' && action !== 'unmute-mic' && action !== 'unmute-audio') {
+    if (roleOf(target) === 'owner' && !lifting) {
       set.status = 403
       return { error: 'owner-protected' satisfies ModerationError }
     }
@@ -86,15 +91,22 @@ export const moderateRoutes = new Elysia().post(
       if (action === 'unmute-mic') blocks.mic = false
       if (action === 'mute-audio') blocks.audio = true
       if (action === 'unmute-audio') blocks.audio = false
+      if (action === 'block-camera') blocks.camera = true
+      if (action === 'unblock-camera') blocks.camera = false
       setBlocks(target, blocks)
 
       // Silencia na hora o que já está publicado e ajusta o que a pessoa pode publicar.
-      if (blocks.mic || blocks.audio) {
+      if (blocks.mic || blocks.audio || blocks.camera) {
         const info = await rooms.getParticipant(ROOM, target)
         for (const track of info.tracks) {
           const isMic = track.source === TrackSource.MICROPHONE
           const isShareAudio = track.source === TrackSource.SCREEN_SHARE_AUDIO
-          if ((blocks.mic && isMic) || (blocks.audio && isShareAudio)) {
+          const isCamera = track.source === TrackSource.CAMERA
+          if (
+            (blocks.mic && isMic) ||
+            (blocks.audio && isShareAudio) ||
+            (blocks.camera && isCamera)
+          ) {
             await rooms.mutePublishedTrack(ROOM, target, track.sid, true)
           }
         }
@@ -110,6 +122,7 @@ export const moderateRoutes = new Elysia().post(
         attributes: {
           serverMic: blocks.mic ? 'blocked' : '',
           serverAudio: blocks.audio ? 'blocked' : '',
+          serverCamera: blocks.camera ? 'blocked' : '',
         },
       })
       return { ok: true }

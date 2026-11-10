@@ -12,6 +12,9 @@ interface Entry {
   size: number
 }
 
+/** Uma janela por pessoa e por fonte: a tela e a câmera de alguém podem ficar abertas juntas. */
+const keyOf = (target: ViewerTarget) => `${target.identity}:${target.source ?? 'screen'}`
+
 /**
  * Uma janela de viewer por pessoa transmitindo; abrir de novo só traz a janela para frente.
  * A mesma transmissão pode virar miniatura sobre o jogo (outra janela, sem moldura).
@@ -22,7 +25,7 @@ export class ViewerManager {
   private dragOffset: { x: number; y: number } | null = null
 
   open(target: ViewerTarget): void {
-    const existing = this.byIdentity.get(target.identity)
+    const existing = this.byIdentity.get(keyOf(target))
     if (existing && !existing.win.isDestroyed()) {
       if (existing.mini) return existing.win.showInactive()
       if (existing.win.isMinimized()) existing.win.restore()
@@ -33,7 +36,10 @@ export class ViewerManager {
   }
 
   private create(target: ViewerTarget, near: Electron.Rectangle | null): void {
-    const title = tm('viewer.windowTitle', { name: target.name })
+    const title =
+      target.source === 'camera'
+        ? tm('viewer.cameraWindowTitle', { name: target.name })
+        : tm('viewer.windowTitle', { name: target.name })
     const win = target.mini ? createMiniViewerWindow(title, near) : createViewerWindow(title)
     const entry: Entry = {
       win,
@@ -42,10 +48,10 @@ export class ViewerManager {
       size: 1,
     }
     const id = win.webContents.id
-    this.byIdentity.set(target.identity, entry)
+    this.byIdentity.set(keyOf(target), entry)
     this.byContents.set(id, entry)
     win.on('closed', () => {
-      if (this.byIdentity.get(target.identity) === entry) this.byIdentity.delete(target.identity)
+      if (this.byIdentity.get(keyOf(target)) === entry) this.byIdentity.delete(keyOf(target))
       this.byContents.delete(id)
     })
   }

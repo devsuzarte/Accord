@@ -101,11 +101,42 @@ Each item has an ID (`F-xx`) so it can become a task/issue (or an OpenSpec chang
 **F-21 While streaming**
 - A red "LIVE" indicator on your own avatar; a "Stop" button; switching sources without stopping.
 - If the shared window closes, the stream stops on its own, with a notice.
+- ✅ (0.6.0) Switching sources: the ⇄ button opens the picker in switch mode. Viewers keep the same track and don't reconnect (see [02](02-architecture.md) › Switching the source).
 
 **F-22 Watching a stream**
 - "LIVE" badge on the participant → click → opens the viewer (a normal window: resizable, full screen with `F11`/double click, its own stream volume, a leave button).
 - Shows the streamer's name and the viewer count (after the MVP: viewer list).
 - ✅ Acceptance: whoever didn't open the viewer does **not** receive the video (saves bandwidth).
+
+## Camera (0.6.0)
+
+**F-23 Turning on the camera**
+- A camera button on the pill turns it on or off during a call. The camera is always **off** when you join.
+- Any video input the system shows works:
+  - the laptop's built-in webcam;
+  - a USB camera;
+  - a **phone shown as a webcam**: on Windows 11 with Android 10+, Settings › Bluetooth & devices › Mobile devices › "Use as connected camera"; other phones need a webcam app.
+- Accord has no phone app.
+- Panel › Channels › **Camera**:
+  - pick the device, with a local, mirrored preview that never goes through the network;
+  - the preview shows by itself while the camera is on;
+  - switching the device while it's on doesn't take the camera off air.
+- Quality: 720p at 30 fps with 180p and 360p layers (simulcast + dynacast).
+- Errors are explained:
+  - Windows privacy blocked the camera;
+  - no camera found;
+  - another app is using it.
+- ✅ Acceptance: from "turn on" to the others seeing your camera on in a few seconds. Turning it off releases the device (the camera light goes off).
+
+**F-24 Watching someone's camera**
+- A camera icon next to the person in the people list (and "See camera" in the right-click menu) opens a window with their camera. It's the same viewer as streams, with full screen and mini mode, but no pointing and no stream reports.
+- The camera and the screen of the same person can be open at the same time.
+- If the person turns the camera off, the window says so. If they turn it back on, it comes back in the same window.
+- ✅ Acceptance: whoever didn't open the window does **not** receive the camera video. The pill only receives voices.
+
+**F-25 Camera moderation**
+- The owner can **turn off someone's camera for everyone**. The server removes the permission to publish the camera, and the person can't turn it back on until the owner allows it. It's saved by name, like the mutes, and survives a host migration.
+- The owner's own camera can't be blocked.
 
 ## Settings and system
 

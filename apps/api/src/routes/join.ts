@@ -119,6 +119,7 @@ export const joinRoutes = new Elysia().post(
             ...(avatar ? { avatar } : {}),
             ...(blocksOf(identity).mic ? { serverMic: 'blocked' } : {}),
             ...(blocksOf(identity).audio ? { serverAudio: 'blocked' } : {}),
+            ...(blocksOf(identity).camera ? { serverCamera: 'blocked' } : {}),
           },
     })
     token.addGrant(

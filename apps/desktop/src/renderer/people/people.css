@@ -176,6 +176,24 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--status-red) 35%, transparent);
 }
 
+/* Câmera ligada (0.6.0): o seu fica só como sinal; o dos outros abre a câmera. */
+.person__camera {
+  display: inline-grid;
+  place-items: center;
+  color: var(--status-green);
+}
+
+.person__camera--watch {
+  width: 24px;
+  height: 22px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.person__camera--watch:hover {
+  background: var(--bg-modifier-hover);
+}
+
 /* ── Menu de ações (clique direito) ──────────────────── */
 
 .menu {

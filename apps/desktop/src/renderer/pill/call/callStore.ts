@@ -13,6 +13,7 @@ import type {
   ShareRequest,
   StreamQualityPreset,
   StreamReport,
+  ViewerSource,
 } from '@sharescreen/shared'
 import {
   normalizeServerUrl,
@@ -46,6 +47,13 @@ import {
 } from './chat'
 import { serverAlive, successionOf, waitForServer } from './migration'
 import type { Successor } from './migration'
+import {
+  cameraCapture,
+  cameraError,
+  cameraPublish,
+  readCameraDevice,
+  saveCameraDevice,
+} from './camera'
 import { noiseContext, RnnoiseProcessor } from './noise'
 import { startScreenShare } from './screenShare'
 import type { ActiveShare } from './screenShare'
@@ -63,6 +71,10 @@ interface CallActions {
   leave(): Promise<void>
   toggleMic(): Promise<void>
   toggleDeafen(): Promise<void>
+  /** Liga/desliga a câmera na chamada (0.6.0). */
+  toggleCamera(): Promise<void>
+  /** Escolhe a câmera; se estiver ligada, troca na hora. */
+  setCameraDevice(deviceId: string): Promise<void>
   setInputDevice(deviceId: string): Promise<void>
   setOutputDevice(deviceId: string): Promise<void>
   startShare(request: ShareRequest): Promise<void>
@@ -71,8 +83,8 @@ interface CallActions {
   /** Abre o seletor no modo "trocar", com o que está no ar marcado. */
   openSwitchPicker(): void
   stopShare(): Promise<void>
-  /** Abre a janela de viewer para assistir a quem está transmitindo. */
-  watch(participant: ParticipantState): void
+  /** Abre a janela de viewer para assistir à transmissão (ou à câmera) de alguém. */
+  watch(participant: ParticipantState, source?: ViewerSource): void
   setNoiseSuppression(mode: AudioState['noiseSuppression']): Promise<void>
   setSounds(enabled: boolean): void
   /** "Mutar para mim": só neste computador, guardado pelo nome da pessoa. */
@@ -338,6 +350,12 @@ function toState(p: Participant, isLocal: boolean, deafened: boolean): Participa
     micMuted: isLocal ? !p.isMicrophoneEnabled || serverMicBlocked : !mic || mic.isMuted,
     deafened: isLocal ? deafened : p.attributes.deafened === '1',
     streaming: !!p.getTrackPublication(Track.Source.ScreenShare),
+    // Desligar a câmera no LiveKit deixa a publicação "mutada" (e solta o dispositivo).
+    camera: (() => {
+      const pub = p.getTrackPublication(Track.Source.Camera)
+      return !!pub && !pub.isMuted
+    })(),
+    serverCameraBlocked: p.attributes.serverCamera === 'blocked',
   }
 }
 
@@ -432,6 +450,11 @@ export const useCallStore = create<CallStore>((set, get) => {
     applyPushToTalk()
     applyVoiceVolumes(get().audio.deafened)
     set({ participants: participantsOf(room, get().audio.deafened) })
+    const local = room.localParticipant
+    const camera = get().camera
+    const on = local.isCameraEnabled
+    const blocked = local.attributes.serverCamera === 'blocked'
+    if (camera.on !== on || camera.blocked !== blocked) set({ camera: { ...camera, on, blocked } })
     updateSuccession(room)
   }
 
@@ -462,6 +485,11 @@ export const useCallStore = create<CallStore>((set, get) => {
     audioHost().replaceChildren()
     room = null
     token = ''
+    // A câmera sai junto com a sala (o LiveKit para a captura ao desconectar).
+    const camera = get().camera
+    if (camera.on || camera.starting || camera.blocked) {
+      set({ camera: { ...camera, on: false, starting: false, blocked: false } })
+    }
   }
 
   const stopMonitor = () => {
@@ -567,6 +595,14 @@ export const useCallStore = create<CallStore>((set, get) => {
           }
           if (participant === r.localParticipant && changed.serverAudio === 'blocked') {
             set({ error: t('call.notice.audioBlocked') })
+          }
+          // O dono desligou (ou liberou) a sua câmera para todos.
+          if (participant === r.localParticipant && 'serverCamera' in changed) {
+            const blocked = changed.serverCamera === 'blocked'
+            if (blocked) void r.localParticipant.setCameraEnabled(false).catch(() => undefined)
+            set({
+              error: blocked ? t('call.notice.cameraBlocked') : t('call.notice.cameraReleased'),
+            })
           }
           if (participant === r.localParticipant && 'role' in changed) {
             const role = toRole(changed.role)
@@ -871,6 +907,7 @@ export const useCallStore = create<CallStore>((set, get) => {
   return {
     status: 'idle',
     audio: loadAudio(),
+    camera: { on: false, starting: false, deviceId: readCameraDevice(), blocked: false },
     sharing: null,
     channelName: null,
     participants: [],
@@ -951,6 +988,49 @@ export const useCallStore = create<CallStore>((set, get) => {
         await updateMe({ deafened })
       }
       refresh()
+    },
+
+    async toggleCamera() {
+      const r = room
+      if (!r || get().status !== 'connected') {
+        set({ error: t('pill.waitConnection') })
+        return
+      }
+      const camera = get().camera
+      if (camera.starting) return
+      const turnOn = !r.localParticipant.isCameraEnabled
+      if (turnOn && r.localParticipant.attributes.serverCamera === 'blocked') {
+        set({ error: t('call.notice.cameraBlocked') })
+        return
+      }
+      set({ camera: { ...camera, starting: turnOn } })
+      try {
+        await r.localParticipant.setCameraEnabled(
+          turnOn,
+          cameraCapture(camera.deviceId),
+          cameraPublish,
+        )
+        log(`câmera ${turnOn ? 'ligada' : 'desligada'}`)
+      } catch (error) {
+        console.error('[call] não consegui ligar a câmera', error)
+        await r.localParticipant.setCameraEnabled(false).catch(() => undefined)
+        set({ error: cameraError(error) })
+      }
+      if (room !== r) return
+      set({ camera: { ...get().camera, starting: false, on: r.localParticipant.isCameraEnabled } })
+      refresh()
+    },
+
+    async setCameraDevice(deviceId) {
+      saveCameraDevice(deviceId)
+      set({ camera: { ...get().camera, deviceId } })
+      const track = room?.localParticipant.getTrackPublication(Track.Source.Camera)?.videoTrack
+      if (!track || !room?.localParticipant.isCameraEnabled) return
+      // Ligada: reabre a captura no dispositivo novo, sem tirar a câmera do ar.
+      await track.restartTrack(cameraCapture(deviceId)).catch((error) => {
+        log(`falha ao trocar de câmera: ${error}`)
+        set({ error: cameraError(error) })
+      })
     },
 
     async setInputDevice(deviceId) {
@@ -1194,11 +1274,13 @@ export const useCallStore = create<CallStore>((set, get) => {
       }
     },
 
-    watch(participant) {
-      if (!serverUrl || participant.isLocal || !participant.streaming) return
+    watch(participant, source = 'screen') {
+      if (!serverUrl || participant.isLocal) return
+      if (source === 'screen' ? !participant.streaming : !participant.camera) return
       window.platform.viewer.open({
         identity: participant.userId,
         name: participant.displayName,
+        source,
         serverUrl,
         token,
       })
@@ -1321,6 +1403,7 @@ export function startReportingCallState(): () => void {
   const toSnapshot = (s: CallStore): CallSnapshot => ({
     status: s.status,
     audio: s.audio,
+    camera: s.camera,
     sharing: s.sharing,
     channelName: s.channelName,
     participants: s.participants,
@@ -1374,8 +1457,12 @@ export function startReportingCallState(): () => void {
         return void store.runSpeedTest()
       case 'watch': {
         const person = store.participants.find((p) => p.userId === command.identity)
-        return person ? store.watch(person) : undefined
+        return person ? store.watch(person, command.source) : undefined
       }
+      case 'toggle-camera':
+        return void store.toggleCamera()
+      case 'set-camera':
+        return void store.setCameraDevice(command.deviceId)
     }
   })
 

@@ -60,7 +60,7 @@ Everything in the user stories above, on **Windows 10 2004+ / 11**, with the ser
 
 - Text chat, direct messages, friends
 - Multiple servers per account (like Discord's server list); in the MVP, **1 instance = 1 server**
-- Camera/webcam
+- ~~Camera/webcam~~ — added in 0.6.0 ([03](03-features.md) › Camera)
 - macOS and Linux (the architecture already allows it; see [risks](06-risks.md))
 - Advanced noise suppression (RNNoise), voice sensitivity with a gate
 - Call recording

@@ -147,6 +147,15 @@ sequenceDiagram
 
 Simulcast is on for the video track. Viewers use `adaptiveStream`, and screen tracks are **not** subscribed automatically: only whoever opens the viewer receives them, to save the host's upload.
 
+### Camera (0.6.0)
+
+- **Publishing:** the pill publishes the camera with `setCameraEnabled` (`Track.Source.Camera`), at 720p30 with 180p/360p simulcast layers.
+- **Turning it off:** LiveKit mutes the publication and stops the device. Viewers treat a muted camera as "off" and resume in the same window when it's unmuted.
+- **Switching the device:** while it's on, `LocalVideoTrack.restartTrack`.
+- **Watching:** the viewer window takes `ViewerTarget.source: 'camera'` and subscribes only to that person's camera. Windows are keyed by person and source, so a person's camera and screen can be open together.
+- **Preview:** the panel's preview is a separate local `getUserMedia`. Chromium's capture service lets the pill and the panel use the same camera at once.
+- **Server:** `allowedSources` adds `CAMERA` unless the owner blocked it (`Blocks.camera`, `serverCamera` attribute).
+
 ### Switching the source without stopping
 
 While streaming, the pill (⇄ button) and Panel › "Your stream" open the picker in **switch mode**:
