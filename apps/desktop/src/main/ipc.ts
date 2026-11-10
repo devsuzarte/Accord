@@ -11,6 +11,7 @@ import type {
   OverlayCorner,
   PanelTab,
   ShareRequest,
+  ShareSwitchInfo,
   Size,
   ViewerTarget,
   PointerPing,
@@ -53,6 +54,20 @@ function isSize(value: unknown): value is Size {
   )
 }
 
+/** O pill diz o que está no ar ao abrir o seletor para trocar de tela. */
+function isShareSwitchInfo(value: unknown): value is ShareSwitchInfo {
+  const v = value as ShareSwitchInfo
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    typeof v.sourceId === 'string' &&
+    v.sourceId.length < 256 &&
+    presets.includes(v.preset) &&
+    typeof v.audio === 'boolean' &&
+    (v.codec === 'h264' || v.codec === 'vp8')
+  )
+}
+
 function isCallCommand(value: unknown): value is CallCommand {
   const v = value as CallCommand
   if (typeof v !== 'object' || v === null) return false
@@ -90,7 +105,7 @@ function isCallCommand(value: unknown): value is CallCommand {
     return presets.includes(v.preset)
   }
   if (v.type === 'auto-quality') return typeof v.enabled === 'boolean'
-  if (v.type === 'speed-test') return true
+  if (v.type === 'speed-test' || v.type === 'switch-share') return true
   return (
     v.type === 'join' &&
     typeof v.name === 'string' &&
@@ -343,8 +358,8 @@ export function registerIpcHandlers({
   ipcMain.handle(IpcChannel.CallGetState, () => lastCall)
 
   // Compartilhamento de tela.
-  ipcMain.on(IpcChannel.ShareOpenPicker, (event) => {
-    if (fromPill(event)) share.openPicker()
+  ipcMain.on(IpcChannel.ShareOpenPicker, (event, switching: unknown) => {
+    if (fromPill(event)) share.openPicker(isShareSwitchInfo(switching) ? switching : null)
   })
   ipcMain.handle(IpcChannel.ShareListSources, (event) =>
     share.isPicker(event.sender.id) ? share.listSources() : { sources: [], audioSupported: false },

@@ -1,6 +1,7 @@
 import type { ParticipantState, ShareState } from '@sharescreen/shared'
 import { Avatar, IconButton, useReportSize } from '@sharescreen/ui'
 import {
+  ArrowLeftRight,
   ChevronsLeft,
   ChevronsRight,
   Ghost,
@@ -59,6 +60,8 @@ interface CallView {
   toggleMic(): void
   toggleDeafen(): void
   toggleShare(): void
+  /** Transmitindo: abre o seletor para trocar a tela ou o app, sem parar. */
+  switchShare(): void
   openPeople(): void
   leave(): void
 }
@@ -90,6 +93,7 @@ function useDemoCall(): CallView {
     participants,
     sharing: me?.streaming
       ? {
+          sourceId: 'screen:demo',
           sourceName: 'Tela de exemplo',
           kind: 'screen',
           preset: 'balanced',
@@ -103,6 +107,7 @@ function useDemoCall(): CallView {
     toggleDeafen: () =>
       updateMe((me) => ({ deafened: !me.deafened, micMuted: !me.deafened || me.micMuted })),
     toggleShare: () => updateMe((me) => ({ streaming: !me.streaming })),
+    switchShare: () => undefined,
     openPeople: () => window.platform.people.toggle(),
     leave: () => setParticipants([]),
   }
@@ -117,6 +122,7 @@ function useRealCall(): CallView {
   const toggleMic = useCallStore((s) => s.toggleMic)
   const toggleDeafen = useCallStore((s) => s.toggleDeafen)
   const stopShare = useCallStore((s) => s.stopShare)
+  const openSwitchPicker = useCallStore((s) => s.openSwitchPicker)
   const leave = useCallStore((s) => s.leave)
   return {
     status,
@@ -133,6 +139,7 @@ function useRealCall(): CallView {
         useCallStore.setState({ error: translateNow('pill.waitConnection') })
       } else window.platform.share.openPicker()
     },
+    switchShare: () => openSwitchPicker(),
     openPeople: () => window.platform.people.toggle(),
     leave: () => void leave(),
   }
@@ -315,6 +322,13 @@ export function Pill() {
                     icon={call.sharing ? <MonitorX size={18} /> : <MonitorUp size={18} />}
                     onClick={call.toggleShare}
                   />
+                  {call.sharing && (
+                    <IconButton
+                      label={t('pill.shareSwitch')}
+                      icon={<ArrowLeftRight size={18} />}
+                      onClick={call.switchShare}
+                    />
+                  )}
                   <IconButton
                     label={t('pill.settings')}
                     icon={<Settings2 size={18} />}

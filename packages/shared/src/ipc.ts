@@ -44,6 +44,8 @@ export const IpcChannel = {
 
   /** pill → main: abrir o seletor de tela. */
   ShareOpenPicker: 'share:open-picker',
+  /** main → seletor: já aberto, mudou o modo (começar ou trocar a fonte). */
+  SharePickerMode: 'share:picker-mode',
   /** seletor → main: telas e janelas disponíveis. */
   ShareListSources: 'share:list-sources',
   /** seletor → main: fonte escolhida (ou cancelar). */

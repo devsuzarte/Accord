@@ -147,6 +147,29 @@ sequenceDiagram
 
 Simulcast is on for the video track. Viewers use `adaptiveStream`, and screen tracks are **not** subscribed automatically: only whoever opens the viewer receives them, to save the host's upload.
 
+### Switching the source without stopping
+
+While streaming, the pill (⇄ button) and Panel › "Your stream" open the picker in **switch mode**:
+- The title says "Switch what you're streaming", and the live source has a LIVE badge.
+- The quality and audio choices start from what's on air.
+- The encoder is locked, because changing the codec would need a new publication.
+
+When a new source is picked:
+1. The pill calls `getDisplayMedia` again. Main hands over the new source through the same `setDisplayMediaRequestHandler`, and the pending choice expires after 15 s.
+2. The pill swaps the capture under the **same publication** with `LocalVideoTrack.replaceTrack`.
+3. **Viewers keep the same remote track, so nobody reconnects or reopens the viewer.**
+
+What else happens during the switch:
+- **Ending:** the `ended` listener moves to the new capture, so closing the newly shared window still ends the stream. The old capture is stopped.
+- **Encoding:** LiveKit recomputes the encodings from the original publish options after a swap, so the pill reapplies the chosen quality.
+- **Audio:** the published audio track stays. Main restarts the native capture for the new source and hands over a new MessagePort. Turning audio off or on in the picker unpublishes or publishes it.
+- **Failure:** if the new capture fails (for example, the window closed meanwhile), the current stream stays on air and the pill says so.
+- **Same source:** picking the same source with only a different quality just retunes it. Picking it with no change at all just closes the picker.
+
+[Observed in tests] On Linux with Xvfb + openbox, switching from the entire screen to another app's window took about 60 ms from the request to the new capture being on air. The viewer kept the same `MediaStreamTrack` id and showed the new window.
+
+Main now looks the source up without thumbnails (`thumbnailSize: 0`). Generating thumbnails for every window used to add a few seconds before a stream started or switched.
+
 ## Backend (apps/api)
 
 ### Data model (Drizzle/SQLite)

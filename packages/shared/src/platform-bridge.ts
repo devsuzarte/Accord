@@ -14,6 +14,7 @@ import type {
   Size,
 } from './ipc'
 import type {
+  ShareSwitchInfo,
   CallCommand,
   CallSnapshot,
   DiscoveredServer,
@@ -99,9 +100,12 @@ export interface PlatformBridge {
   }
   share: {
     /** Pill: abre o seletor de tela. */
-    openPicker(): void
+    /** `switching`: trocar a fonte de uma transmissão em andamento (sem parar). */
+    openPicker(switching?: ShareSwitchInfo): void
     /** Seletor: lista telas e janelas. */
     listSources(): Promise<ShareSourceList>
+    /** Seletor: o pill pediu de novo com outro modo (começar ou trocar), com ele já aberto. */
+    onPickerMode(listener: (switching: ShareSwitchInfo | null) => void): Unsubscribe
     /** Seletor: confirma a escolha. */
     select(request: ShareRequest): void
     cancel(): void
