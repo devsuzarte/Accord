@@ -49,6 +49,14 @@ and joining again 403.
 - The firewall rule created from the Host tab only accepts private ranges and VPN ranges
   (`RemoteAddress`), never the whole internet.
 
+### Added in 0.6.0
+
+- **Camera:** `TrackSource.CAMERA` is in `canPublishSources` unless the owner blocked it.
+  - The new `block-camera` / `unblock-camera` actions are owner-only and can't target the owner. They mute the published camera at once and remove the permission. They're saved by name, like the mic and audio blocks.
+  - Only the pill can publish. Others receive a camera only by opening it, through the viewer's own hidden connection; the pill never subscribes to video.
+  - The camera is always off when you join, and turning it off releases the device.
+- **Electron fuses** (docs/16 P2), below.
+
 ### Added after 0.5.0 (docs/16)
 
 - **Electron fuses** in the packaged app (`electronFuses` in `electron-builder.yml`):

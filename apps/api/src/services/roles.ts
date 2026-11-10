@@ -16,6 +16,8 @@ const roles = new Map<string, Role>()
 export interface Blocks {
   mic: boolean
   audio: boolean
+  /** Câmera desligada pelo dono (0.6.0). Cópias antigas da sessão não têm: vale `false`. */
+  camera: boolean
 }
 /**
  * Guardados pelo NOME (não pela identidade, que muda a cada entrada): sair e entrar de novo
@@ -40,7 +42,7 @@ export function roleOf(identity: string): Role {
 }
 
 export function blocksOf(identity: string): Blocks {
-  return blocks.get(keyOf(identity)) ?? { mic: false, audio: false }
+  return blocks.get(keyOf(identity)) ?? { mic: false, audio: false, camera: false }
 }
 
 export function setBlocks(identity: string, value: Blocks): void {
@@ -67,10 +69,12 @@ export function exportBlocks(): Record<string, Blocks> {
   return Object.fromEntries(blocks)
 }
 
-export function importBlocks(saved: Record<string, Blocks>): void {
+export function importBlocks(
+  saved: Record<string, { mic: boolean; audio: boolean; camera?: boolean }>,
+): void {
   for (const [name, value] of Object.entries(saved)) {
     if (typeof value?.mic === 'boolean' && typeof value?.audio === 'boolean') {
-      blocks.set(name, { mic: value.mic, audio: value.audio })
+      blocks.set(name, { mic: value.mic, audio: value.audio, camera: value.camera === true })
     }
   }
 }

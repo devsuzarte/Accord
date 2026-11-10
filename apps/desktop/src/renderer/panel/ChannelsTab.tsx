@@ -42,6 +42,7 @@ import type { FormEvent } from 'react'
 import { channelLabel, useT } from '../shared/i18n'
 import { readJson, readString, write } from '../shared/storage'
 import { AudioSettings } from './AudioSettings'
+import { CameraSection } from './CameraSettings'
 import { InviteCard, useInvite } from './InviteCard'
 import { BandwidthTable, FirewallRow, NetworkTest, ShareHealth } from './StreamHealth'
 import { CopyInviteButton } from '../shared/CopyInviteButton'
@@ -131,6 +132,7 @@ export function ChannelsTab({ call, profile, onEditProfile }: ChannelsTabProps) 
       {mode === 'guide' && <Guide />}
 
       {mode !== 'guide' && <AudioSection call={call} />}
+      {mode !== 'guide' && <CameraSection call={call} />}
     </div>
   )
 }

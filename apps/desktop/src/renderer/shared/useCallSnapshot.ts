@@ -11,6 +11,7 @@ const initial: CallSnapshot = {
     noiseSuppression: 'rnnoise',
     sounds: true,
   },
+  camera: { on: false, starting: false, deviceId: '', blocked: false },
   sharing: null,
   channelName: null,
   server: null,

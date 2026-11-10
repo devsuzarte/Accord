@@ -14,10 +14,12 @@ import {
 } from 'lucide-react'
 import { Room, RoomEvent, Track } from 'livekit-client'
 import type {
+  Participant,
   RemoteParticipant,
   RemoteTrack,
   RemoteTrackPublication,
   RemoteVideoTrack,
+  TrackPublication,
 } from 'livekit-client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
@@ -55,6 +57,12 @@ function readVolume(): number {
 const isScreenSource = (source: Track.Source) =>
   source === Track.Source.ScreenShare || source === Track.Source.ScreenShareAudio
 
+/** A janela mostra a transmissão de tela (padrão) ou a câmera da pessoa (0.6.0). */
+const videoSourceOf = (target: ViewerTarget) =>
+  target.source === 'camera' ? Track.Source.Camera : Track.Source.ScreenShare
+const wantedBy = (target: ViewerTarget) => (source: Track.Source) =>
+  target.source === 'camera' ? source === Track.Source.Camera : isScreenSource(source)
+
 /**
  * Viewer: conexão própria e invisível (token de espectador), que recebe SÓ a tela e o
  * som da transmissão de uma pessoa — o pill continua recebendo só as vozes.
@@ -64,6 +72,7 @@ export function Viewer() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const [target, setTarget] = useState<ViewerTarget | null>(null)
+  const cameraMode = target?.source === 'camera'
   const [phase, setPhase] = useState<Phase>('connecting')
   const [message, setMessage] = useState('')
   const [hasAudio, setHasAudio] = useState(false)
@@ -78,7 +87,12 @@ export function Viewer() {
   } | null>(null)
   const [choice, setChoice] = useState<QualityChoice>(readQualityChoice)
   // Apontar na tela: o token desta conexão de assistir e quem escuta os marcadores.
-  const access = useRef<{ token: string; serverUrl: string; target: string } | null>(null)
+  const access = useRef<{
+    token: string
+    serverUrl: string
+    target: string
+    camera: boolean
+  } | null>(null)
   const pingListeners = useRef(new Set<(ping: PointerPing) => void>())
   const pingSource = useCallback((listener: (ping: PointerPing) => void) => {
     pingListeners.current.add(listener)
@@ -105,7 +119,8 @@ export function Viewer() {
   const lastReport = useRef(0)
   useEffect(() => {
     const a = access.current
-    if (!stats || !a || stats.diagnosis === 'warming') return
+    // Câmera: não há "transmissão" para avisar quem transmite.
+    if (!stats || !a || a.camera || stats.diagnosis === 'warming') return
     const now = Date.now()
     if (now - lastReport.current < 4000) return
     lastReport.current = now
@@ -152,7 +167,14 @@ export function Viewer() {
         return
       }
       if (cancelled) return
-      access.current = { token: joined.token, serverUrl: who.serverUrl, target: who.identity }
+      access.current = {
+        token: joined.token,
+        serverUrl: who.serverUrl,
+        target: who.identity,
+        camera: who.source === 'camera',
+      }
+      const videoSource = videoSourceOf(who)
+      const wanted = wantedBy(who)
 
       const r = new Room({ adaptiveStream: true, dynacast: true })
       room = r
@@ -160,29 +182,31 @@ export function Viewer() {
       const subscribeTo = (participant: RemoteParticipant) => {
         if (participant.identity !== who.identity) return
         participant.trackPublications.forEach((pub) => {
-          if (isScreenSource(pub.source)) pub.setSubscribed(true)
+          if (wanted(pub.source)) pub.setSubscribed(true)
         })
       }
-      const isStreaming = () =>
-        !!r.remoteParticipants.get(who.identity)?.getTrackPublication(Track.Source.ScreenShare)
+      // Câmera desligada fica publicada mas "mutada": conta como não estar no ar.
+      const isStreaming = () => {
+        const pub = r.remoteParticipants.get(who.identity)?.getTrackPublication(videoSource)
+        return !!pub && !(who.source === 'camera' && pub.isMuted)
+      }
 
       r.on(RoomEvent.ParticipantConnected, subscribeTo)
         .on(
           RoomEvent.TrackPublished,
           (pub: RemoteTrackPublication, participant: RemoteParticipant) => {
-            if (participant.identity === who.identity && isScreenSource(pub.source))
-              pub.setSubscribed(true)
+            if (participant.identity === who.identity && wanted(pub.source)) pub.setSubscribed(true)
           },
         )
         .on(
           RoomEvent.TrackSubscribed,
           (track: RemoteTrack, pub: RemoteTrackPublication, participant: RemoteParticipant) => {
             if (participant.identity !== who.identity) return
-            if (track.source === Track.Source.ScreenShare && videoRef.current) {
+            if (track.source === videoSource && videoRef.current) {
               track.attach(videoRef.current)
               applyQualityChoice(pub, readQualityChoice())
               setScreen({ track: track as RemoteVideoTrack, pub, participant })
-              setPhase('live')
+              setPhase(pub.isMuted ? 'waiting' : 'live')
             }
             if (track.source === Track.Source.ScreenShareAudio && audioRef.current) {
               track.attach(audioRef.current)
@@ -192,17 +216,28 @@ export function Viewer() {
         )
         .on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
           track.detach()
-          if (track.source === Track.Source.ScreenShare) setScreen(null)
+          if (track.source === videoSource) setScreen(null)
           if (track.source === Track.Source.ScreenShareAudio) setHasAudio(false)
         })
         .on(
           RoomEvent.TrackUnpublished,
           (pub: RemoteTrackPublication, participant: RemoteParticipant) => {
-            if (participant.identity === who.identity && pub.source === Track.Source.ScreenShare) {
+            if (participant.identity === who.identity && pub.source === videoSource) {
               setPhase('ended')
             }
           },
         )
+        // Câmera: desligar = "mutar" a publicação; religar volta na mesma janela.
+        .on(RoomEvent.TrackMuted, (pub: TrackPublication, participant: Participant) => {
+          if (participant.identity === who.identity && pub.source === videoSource) {
+            setPhase('waiting')
+          }
+        })
+        .on(RoomEvent.TrackUnmuted, (pub: TrackPublication, participant: Participant) => {
+          if (participant.identity === who.identity && pub.source === videoSource) {
+            setPhase('live')
+          }
+        })
         .on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
           if (participant.identity === who.identity) setPhase('ended')
         })
@@ -367,7 +402,7 @@ export function Viewer() {
   const point = (event: ReactMouseEvent<HTMLVideoElement>) => {
     const video = event.currentTarget
     const a = access.current
-    if (!a || !video.videoWidth || mini?.locked) return
+    if (!a || a.camera || !video.videoWidth || mini?.locked) return
     // Onde o quadro está de fato dentro do <video> (object-fit: contain deixa faixas).
     const box = video.getBoundingClientRect()
     const scale = Math.min(box.width / video.videoWidth, box.height / video.videoHeight)
@@ -428,13 +463,13 @@ export function Viewer() {
         autoPlay
         playsInline
         muted
-        title={phase === 'live' && !mini?.locked ? t('viewer.pointHint') : undefined}
+        title={phase === 'live' && !mini?.locked && !cameraMode ? t('viewer.pointHint') : undefined}
         onClick={point}
         onDoubleClick={mini ? undefined : toggleFullscreen}
         hidden={phase !== 'live'}
       />
       <audio ref={audioRef} autoPlay />
-      {phase === 'live' && frame && (
+      {phase === 'live' && frame && !cameraMode && (
         <div className="viewer__pings" style={frame}>
           <Pings source={pingSource} />
         </div>
@@ -453,10 +488,18 @@ export function Viewer() {
         <div className="viewer__state" role="status">
           {phase === 'connecting' && <p>{t('viewer.connecting')}</p>}
           {phase === 'waiting' && (
-            <p>{t('viewer.notStreaming', { name: target?.name ?? t('viewer.thisPerson') })}</p>
+            <p>
+              {cameraMode
+                ? t('viewer.cameraOff', { name: target?.name ?? t('viewer.thisPerson') })
+                : t('viewer.notStreaming', { name: target?.name ?? t('viewer.thisPerson') })}
+            </p>
           )}
           {phase === 'ended' && (
-            <p>{t('viewer.ended', { name: target?.name ?? t('viewer.thisPersonLower') })}</p>
+            <p>
+              {cameraMode
+                ? t('viewer.cameraEnded', { name: target?.name ?? t('viewer.thisPerson') })
+                : t('viewer.ended', { name: target?.name ?? t('viewer.thisPersonLower') })}
+            </p>
           )}
           {phase === 'error' && <p>{message}</p>}
           {(phase === 'ended' || phase === 'error') && closingIn !== null && (
@@ -468,7 +511,9 @@ export function Viewer() {
       <header className="viewer__bar" hidden={!!mini}>
         <span className="viewer__who">
           {phase === 'live' && <span className="viewer__live">{t('common.live')}</span>}
-          {target?.name ?? t('viewer.stream')}
+          {cameraMode && target
+            ? t('viewer.cameraWindowTitle', { name: target.name })
+            : (target?.name ?? t('viewer.stream'))}
         </span>
 
         <span className="viewer__tools">
@@ -500,7 +545,8 @@ export function Viewer() {
               />
             </span>
           ) : (
-            phase === 'live' && <span className="viewer__note">{t('viewer.noAudio')}</span>
+            phase === 'live' &&
+            !cameraMode && <span className="viewer__note">{t('viewer.noAudio')}</span>
           )}
           <button
             type="button"

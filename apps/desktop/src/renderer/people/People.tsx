@@ -9,6 +9,7 @@ import {
   PenLine,
   ShieldCheck,
   Unplug,
+  Video,
   VolumeX,
   X,
 } from 'lucide-react'
@@ -194,6 +195,23 @@ function PersonRow({
         ) : (
           person.micMuted && <MicOff size={15} aria-label={t('pill.micOff')} />
         )}
+        {person.camera &&
+          (person.isLocal ? (
+            <Video size={15} className="person__camera" aria-label={t('people.cameraOn')} />
+          ) : (
+            <button
+              type="button"
+              className="person__camera person__camera--watch"
+              title={t('people.watchCamera', { name: person.displayName })}
+              aria-label={t('people.watchCamera', { name: person.displayName })}
+              onClick={(event) => {
+                event.stopPropagation()
+                send({ type: 'watch', identity: person.userId, source: 'camera' })
+              }}
+            >
+              <Video size={15} />
+            </button>
+          ))}
         {person.streaming &&
           (person.isLocal ? (
             <span className="live">{t('common.live')}</span>
@@ -241,15 +259,22 @@ function itemsFor(person: ParticipantState, me: ParticipantState): MenuItem[][] 
   const target = person.userId
   const groups: MenuItem[][] = []
 
+  const watching: MenuItem[] = []
   if (person.streaming) {
-    groups.push([
-      {
-        label: t('menu.watch'),
-        icon: MonitorPlay,
-        run: () => send({ type: 'watch', identity: target }),
-      },
-    ])
+    watching.push({
+      label: t('menu.watch'),
+      icon: MonitorPlay,
+      run: () => send({ type: 'watch', identity: target }),
+    })
   }
+  if (person.camera) {
+    watching.push({
+      label: t('menu.watchCamera'),
+      icon: Video,
+      run: () => send({ type: 'watch', identity: target, source: 'camera' }),
+    })
+  }
+  if (watching.length) groups.push(watching)
 
   groups.push([
     {
@@ -287,6 +312,17 @@ function itemsFor(person: ParticipantState, me: ParticipantState): MenuItem[][] 
           send({
             type: 'moderate',
             action: person.serverAudioBlocked ? 'unmute-audio' : 'mute-audio',
+            target,
+          }),
+      },
+      {
+        label: t('menu.blockCamera'),
+        hint: t('menu.blockCameraHint'),
+        checked: person.serverCameraBlocked,
+        run: () =>
+          send({
+            type: 'moderate',
+            action: person.serverCameraBlocked ? 'unblock-camera' : 'block-camera',
             target,
           }),
       },

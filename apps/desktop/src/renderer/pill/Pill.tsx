@@ -1,4 +1,4 @@
-import type { ParticipantState, ShareState } from '@sharescreen/shared'
+import type { CameraState, ParticipantState, ShareState } from '@sharescreen/shared'
 import { Avatar, IconButton, useReportSize } from '@sharescreen/ui'
 import {
   ArrowLeftRight,
@@ -18,6 +18,8 @@ import {
   Settings2,
   MessageSquare,
   Users,
+  Video,
+  VideoOff,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { demoEnabled, demoParticipants } from '../shared/demo'
@@ -53,12 +55,14 @@ interface CallView {
   status: 'idle' | 'connecting' | 'connected' | 'reconnecting'
   participants: ParticipantState[]
   sharing: ShareState | null
+  camera: CameraState
   /** Última mensagem de erro (some sozinha do pill depois de alguns segundos). */
   error: string | null
   /** A transmissão está travando (processador, banda ou quem assiste reclamou). */
   shareTrouble: 'cpu' | 'bandwidth' | 'viewers' | null
   toggleMic(): void
   toggleDeafen(): void
+  toggleCamera(): void
   toggleShare(): void
   /** Transmitindo: abre o seletor para trocar a tela ou o app, sem parar. */
   switchShare(): void
@@ -101,12 +105,14 @@ function useDemoCall(): CallView {
           audio: 'on',
         }
       : null,
+    camera: { on: !!me?.camera, starting: false, deviceId: '', blocked: false },
     error: null,
     shareTrouble: null,
     toggleMic: () => updateMe((me) => ({ micMuted: !me.micMuted })),
     toggleDeafen: () =>
       updateMe((me) => ({ deafened: !me.deafened, micMuted: !me.deafened || me.micMuted })),
     toggleShare: () => updateMe((me) => ({ streaming: !me.streaming })),
+    toggleCamera: () => updateMe((me) => ({ camera: !me.camera })),
     switchShare: () => undefined,
     openPeople: () => window.platform.people.toggle(),
     leave: () => setParticipants([]),
@@ -117,10 +123,12 @@ function useRealCall(): CallView {
   const status = useCallStore((s) => s.status)
   const participants = useCallStore((s) => s.participants)
   const sharing = useCallStore((s) => s.sharing)
+  const camera = useCallStore((s) => s.camera)
   const error = useCallStore((s) => s.error)
   const shareTrouble = useCallStore((s) => s.shareAdvice?.reason ?? null)
   const toggleMic = useCallStore((s) => s.toggleMic)
   const toggleDeafen = useCallStore((s) => s.toggleDeafen)
+  const toggleCamera = useCallStore((s) => s.toggleCamera)
   const stopShare = useCallStore((s) => s.stopShare)
   const openSwitchPicker = useCallStore((s) => s.openSwitchPicker)
   const leave = useCallStore((s) => s.leave)
@@ -128,10 +136,12 @@ function useRealCall(): CallView {
     status,
     participants,
     sharing,
+    camera,
     error,
     shareTrouble,
     toggleMic: () => void toggleMic(),
     toggleDeafen: () => void toggleDeafen(),
+    toggleCamera: () => void toggleCamera(),
     // Começar abre o seletor; a transmissão começa quando a escolha voltar do main.
     toggleShare: () => {
       if (sharing) void stopShare()
@@ -315,6 +325,26 @@ export function Pill() {
                     tone={me.deafened ? 'alert' : 'default'}
                     icon={me.deafened ? <HeadphoneOff size={18} /> : <Headphones size={18} />}
                     onClick={call.toggleDeafen}
+                  />
+                  <IconButton
+                    label={
+                      call.camera.blocked
+                        ? t('pill.cameraBlocked')
+                        : call.camera.on
+                          ? t('pill.cameraOff')
+                          : t('pill.cameraOn')
+                    }
+                    tone={call.camera.on ? 'on' : call.camera.blocked ? 'alert' : 'default'}
+                    icon={
+                      call.camera.starting ? (
+                        <Loader size={18} className="spin" />
+                      ) : call.camera.on ? (
+                        <Video size={18} />
+                      ) : (
+                        <VideoOff size={18} />
+                      )
+                    }
+                    onClick={call.toggleCamera}
                   />
                   <IconButton
                     label={call.sharing ? t('pill.shareStop') : t('pill.shareStart')}

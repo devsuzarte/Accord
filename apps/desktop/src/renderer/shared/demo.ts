@@ -14,6 +14,7 @@ function person(
     role: 'member',
     serverMicBlocked: false,
     serverAudioBlocked: false,
+    serverCameraBlocked: false,
     localMicMuted: false,
     localAudioMuted: false,
     volume: 1,
@@ -22,6 +23,7 @@ function person(
     micMuted: false,
     deafened: false,
     streaming: false,
+    camera: false,
     ...patch,
   }
 }

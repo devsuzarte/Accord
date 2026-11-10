@@ -29,6 +29,8 @@ export interface ParticipantState {
   serverMicBlocked: boolean
   /** O dono silenciou o som da transmissão dessa pessoa para todos. */
   serverAudioBlocked: boolean
+  /** O dono desligou a câmera dessa pessoa para todos (0.6.0). */
+  serverCameraBlocked: boolean
   /** Você silenciou a voz dessa pessoa só para você. */
   localMicMuted: boolean
   /** Você silenciou o som da transmissão dessa pessoa só para você. */
@@ -41,6 +43,8 @@ export interface ParticipantState {
   micMuted: boolean
   deafened: boolean
   streaming: boolean
+  /** Câmera ligada (0.6.0). */
+  camera: boolean
 }
 
 export type OverlayMode = 'hidden' | 'collapsed' | 'compact' | 'expanded'
@@ -63,7 +67,15 @@ export interface JoinResponse {
 }
 
 export type ModerationAction =
-  'mute-mic' | 'unmute-mic' | 'mute-audio' | 'unmute-audio' | 'kick' | 'make-admin' | 'remove-admin'
+  | 'mute-mic'
+  | 'unmute-mic'
+  | 'mute-audio'
+  | 'unmute-audio'
+  | 'block-camera'
+  | 'unblock-camera'
+  | 'kick'
+  | 'make-admin'
+  | 'remove-admin'
 
 export type CallStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting'
 
@@ -80,10 +92,24 @@ export interface AudioState {
   sounds: boolean
 }
 
+/** Sua câmera (0.6.0): qualquer entrada de vídeo do sistema — webcam do notebook, USB, ou o
+ * celular quando ele aparece como webcam. */
+export interface CameraState {
+  /** Ligada e publicada na chamada. */
+  on: boolean
+  /** Ligando (pedindo o dispositivo e publicando). */
+  starting: boolean
+  /** '' = padrão do sistema. */
+  deviceId: string
+  /** O dono desligou a sua câmera para todos. */
+  blocked: boolean
+}
+
 /** Retrato da chamada: o pill (dono da conexão) publica, o painel acompanha. */
 export interface CallSnapshot {
   status: CallStatus
   audio: AudioState
+  camera: CameraState
   /** Sua transmissão em andamento, se houver. */
   sharing: ShareState | null
   channelName: string | null
@@ -126,6 +152,9 @@ export type CallCommand =
     }
   | { type: 'ptt'; down: boolean }
   | { type: 'retune-share'; preset: StreamQualityPreset }
+  /** Câmera (0.6.0): ligar/desligar e escolher o dispositivo (vale também fora da chamada). */
+  | { type: 'toggle-camera' }
+  | { type: 'set-camera'; deviceId: string }
   /** Abre o seletor para trocar o que está sendo transmitido, sem parar a transmissão. */
   | { type: 'switch-share' }
   | { type: 'auto-quality'; enabled: boolean }
@@ -140,7 +169,8 @@ export type CallCommand =
   | { type: 'local-mute'; name: string; kind: 'mic' | 'audio'; muted: boolean }
   | { type: 'set-volume'; name: string; volume: number }
   | { type: 'moderate'; action: ModerationAction; target: string }
-  | { type: 'watch'; identity: string }
+  /** Abrir a transmissão (padrão) ou a câmera de alguém numa janela. */
+  | { type: 'watch'; identity: string; source?: ViewerSource }
 
 // ───────────────────────── Compartilhamento de tela ─────────────────────────
 
@@ -273,9 +303,14 @@ export interface ShareState {
 }
 
 /** Quem o viewer vai assistir. */
+/** O que a janela de assistir mostra: a transmissão de tela ou a câmera da pessoa. */
+export type ViewerSource = 'screen' | 'camera'
+
 export interface ViewerTarget {
   identity: string
   name: string
+  /** Padrão: 'screen'. */
+  source?: ViewerSource
   serverUrl: string
   /** Token da chamada de quem assiste: o servidor só dá a conexão de assistir a quem está na call. */
   token: string
@@ -586,7 +621,7 @@ export interface SessionSnapshot {
   session: string
   messages: ChatMessage[]
   files: ChatAttachment[]
-  blocks: Record<string, { mic: boolean; audio: boolean }>
+  blocks: Record<string, { mic: boolean; audio: boolean; camera?: boolean }>
 }
 
 /** O que o pill conta para o main e a janela de chat (o chat vive no pill, como a chamada). */

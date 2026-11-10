@@ -26,9 +26,14 @@ export async function verifyToken(
 }
 
 /** Fontes que cada participante pode publicar, conforme os bloqueios do dono. */
-export function allowedSources(blocks: { mic: boolean; audio: boolean }): TrackSource[] {
+export function allowedSources(blocks: {
+  mic: boolean
+  audio: boolean
+  camera: boolean
+}): TrackSource[] {
   const sources = [TrackSource.SCREEN_SHARE]
   if (!blocks.mic) sources.push(TrackSource.MICROPHONE)
   if (!blocks.audio) sources.push(TrackSource.SCREEN_SHARE_AUDIO)
+  if (!blocks.camera) sources.push(TrackSource.CAMERA)
   return sources
 }
