@@ -576,4 +576,23 @@ export const ptBR = {
   'viewer.quality.route.tcp': 'TCP (UDP bloqueado)',
   'viewer.diag.tcp':
     'O vídeo está vindo por TCP porque a porta UDP está bloqueada (no seu PC ou no de quem hospeda). Com perda, a imagem trava mais.',
+  'recover.crashed': 'O Accord travou. Voltando para a chamada…',
+  'recover.gaveUpTitle': 'O Accord parou de responder',
+  'recover.gaveUpBody': 'Ele travou várias vezes seguidas. Clique para tentar de novo.',
+  'recover.gaveUp': 'O Accord travou várias vezes seguidas e saiu da chamada.',
+  'tray.reloadOverlay': 'Recarregar o overlay',
+  'gpu.crashTitle': 'A placa de vídeo travou várias vezes',
+  'gpu.crashBody':
+    'Clique para reiniciar o Accord sem aceleração de hardware. Dá para religar pela bandeja › Ajuda.',
+  'tray.hardwareAcceleration': 'Usar aceleração de hardware (reinicia)',
+  'pill.streamingQuiet': 'Nenhum som do app chegando',
+  'pill.streamingQuietHint':
+    'O app está em silêncio ou a captura parou. O Accord tenta religar a captura sozinho.',
+  'share.audio.windowsBuild':
+    'O som da transmissão precisa do Windows 10 versão 2004 ou mais novo.',
+  'overlay.hideTitle': 'Esconder o Accord das capturas',
+  'overlay.hideText':
+    'Pill, painel, chat e lista de pessoas não aparecem quando você transmite ou grava a tela.',
+  'overlay.hideUnsupported':
+    'Este sistema não deixa esconder janelas das capturas: elas sempre aparecem.',
 } as const

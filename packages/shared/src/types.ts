@@ -116,7 +116,14 @@ export interface CallServer {
 
 /** Comandos que o painel manda para o pill (via main). */
 export type CallCommand =
-  | { type: 'join'; name: string; serverUrl: string; password?: string | null }
+  | {
+      type: 'join'
+      name: string
+      serverUrl: string
+      password?: string | null
+      /** Só o main manda: volta depois de o pill travar, reusando a mesma identidade. */
+      resume?: boolean
+    }
   | { type: 'ptt'; down: boolean }
   | { type: 'retune-share'; preset: StreamQualityPreset }
   | { type: 'auto-quality'; enabled: boolean }
@@ -244,8 +251,11 @@ export interface ShareState {
   preset: StreamQualityPreset
   /** Codec que está sendo usado de fato (`h264` ou `vp8`). */
   codec: 'h264' | 'vp8'
-  /** on: transmitindo som · off: escolheu sem som · failed: tentou e não deu. */
-  audio: 'on' | 'off' | 'failed'
+  /**
+   * on: transmitindo som · off: escolheu sem som · failed: tentou e não deu ·
+   * quiet: ligado, mas nenhum som do app chega há um tempo (silêncio ou captura parada).
+   */
+  audio: 'on' | 'off' | 'failed' | 'quiet'
 }
 
 /** Quem o viewer vai assistir. */

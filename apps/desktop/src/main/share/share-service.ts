@@ -11,9 +11,10 @@ import {
 } from 'electron'
 import type { MessagePortMain } from 'electron'
 import type Koffi from 'koffi'
-import { IpcChannel } from '@sharescreen/shared'
+import { IpcChannel, SHARE_AUDIO_STATUS } from '@sharescreen/shared'
 import type {
   ShareAudioResult,
+  ShareAudioStatus,
   ShareKind,
   ShareRequest,
   ShareSourceList,
@@ -27,9 +28,16 @@ import {
   secureWebPreferences,
 } from '../windows/common'
 import { NativeShareAudio, nativeAudioSupported } from './native-audio'
+import { protectWindow } from '../windows/content-protection'
 
 const PICKER_WIDTH = 760
 const PICKER_HEIGHT = 560
+/** Sem nenhum pedaço de som por esse tempo: primeira tentativa de reiniciar a captura. */
+const AUDIO_RESTART_MS = 10_000
+/** Ainda sem som depois disso (já com o reinício): avisa quem transmite. */
+const AUDIO_QUIET_MS = 15_000
+const AUDIO_RESTART_MAX_MS = 60_000
+const AUDIO_WATCH_MS = 2_000
 
 /**
  * Compartilhamento de tela:
@@ -45,6 +53,13 @@ export class ShareService {
   private activeSource: { id: string; displayId: string } | null = null
   private readonly audio = new NativeShareAudio()
   private audioPort: MessagePortMain | null = null
+  /** Vigia do som (docs/16 P4): a fonte em uso e quando chegou o último pedaço. */
+  private audioSource: { kind: ShareKind; sourceId: string } | null = null
+  private audioWatch: NodeJS.Timeout | null = null
+  private lastChunkAt = 0
+  private audioQuiet = false
+  private restartDelay = AUDIO_RESTART_MS
+  private nextRestartAt = 0
 
   constructor(private readonly overlay: OverlayManager) {}
 
@@ -98,7 +113,7 @@ export class ShareService {
       webPreferences: secureWebPreferences(),
     })
     // O seletor não aparece na própria captura (nem na miniatura de "tela inteira").
-    picker.setContentProtection(true)
+    protectWindow(picker, { always: true })
     keepOnTop(picker)
     hardenNavigation(picker)
     picker.once('ready-to-show', () => {
@@ -201,7 +216,7 @@ export class ShareService {
     this.stopAudio()
     const { port1, port2 } = new MessageChannelMain()
     try {
-      this.audio.start(kind, sourceId, (chunk) => port1.postMessage(chunk))
+      this.audio.start(kind, sourceId, (chunk) => this.onAudioChunk(port1, chunk))
       console.info(`[share] som nativo ligado (${kind})`)
       if (kind === 'screen') {
         // Diagnóstico do "eco": o som do próprio app sai pelo serviço de áudio, filho deste processo.
@@ -223,13 +238,80 @@ export class ShareService {
     port1.start()
     this.audioPort = port1
     this.overlay.postToPill(IpcChannel.ShareAudioPort, [port2])
+    this.watchAudio(kind, sourceId)
     return { ok: true }
   }
 
   stopAudio(): void {
+    if (this.audioWatch) clearInterval(this.audioWatch)
+    this.audioWatch = null
+    this.audioSource = null
     this.audio.stop()
     this.audioPort?.close()
     this.audioPort = null
+  }
+
+  private onAudioChunk(port: MessagePortMain, chunk: Buffer): void {
+    const now = Date.now()
+    this.lastChunkAt = now
+    this.restartDelay = AUDIO_RESTART_MS
+    this.nextRestartAt = now + AUDIO_RESTART_MS
+    if (this.audioQuiet) {
+      this.audioQuiet = false
+      console.info('[share] o som do app voltou a chegar')
+      this.sendAudioStatus({ state: 'flowing' })
+    }
+    port.postMessage(chunk)
+  }
+
+  /**
+   * A captura nativa não manda nada no silêncio (o loopback-capture descarta pedaços abaixo de
+   * -70 dB) e, se der erro (ex.: trocou o dispositivo de saída), para de vez sem avisar. Por
+   * fora, as duas coisas parecem iguais. Então: depois de 10 s sem som, reinicia a captura (com
+   * espera dobrando até 1 min). No silêncio, reiniciar não muda nada; se a captura tinha
+   * morrido, o som volta. Se aos 15 s ainda não chegou nada, avisa quem transmite.
+   */
+  private watchAudio(kind: ShareKind, sourceId: string): void {
+    const now = Date.now()
+    this.audioSource = { kind, sourceId }
+    this.lastChunkAt = now
+    this.audioQuiet = false
+    this.restartDelay = AUDIO_RESTART_MS
+    this.nextRestartAt = now + AUDIO_RESTART_MS
+    this.audioWatch = setInterval(() => this.checkAudio(), AUDIO_WATCH_MS)
+  }
+
+  private checkAudio(): void {
+    const source = this.audioSource
+    const port = this.audioPort
+    if (!source || !port) return
+    const now = Date.now()
+    const silentMs = now - this.lastChunkAt
+    if (!this.audioQuiet && silentMs >= AUDIO_QUIET_MS) {
+      this.audioQuiet = true
+      console.info(`[share] nenhum som do app há ${Math.round(silentMs / 1000)} s`)
+      this.sendAudioStatus({ state: 'quiet' })
+    }
+    if (now < this.nextRestartAt) return
+    this.restartDelay = Math.min(this.restartDelay * 2, AUDIO_RESTART_MAX_MS)
+    this.nextRestartAt = now + this.restartDelay
+    try {
+      this.audio.start(source.kind, source.sourceId, (chunk) => this.onAudioChunk(port, chunk))
+      console.info(
+        `[share] sem som há ${Math.round(silentMs / 1000)} s: reiniciei a captura (próxima em ${this.restartDelay / 1000} s)`,
+      )
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : tm('share.audio.failed')
+      console.warn('[share] não consegui reiniciar a captura do som', error)
+      if (this.audioWatch) clearInterval(this.audioWatch)
+      this.audioWatch = null
+      this.audioSource = null
+      this.sendAudioStatus({ state: 'failed', reason })
+    }
+  }
+
+  private sendAudioStatus(status: Omit<ShareAudioStatus, 'type'>): void {
+    this.audioPort?.postMessage({ type: SHARE_AUDIO_STATUS, ...status })
   }
 }
 

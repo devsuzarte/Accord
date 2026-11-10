@@ -16,6 +16,7 @@ import type {
   PointerPing,
 } from '@sharescreen/shared'
 import type { HotkeyService } from './hotkeys'
+import { CallRecovery } from './call-recovery'
 import { tm } from './i18n'
 import type { DiscoveryService } from './network/discovery'
 import type { HostService } from './network/host-service'
@@ -29,6 +30,11 @@ import type { ShareService } from './share/share-service'
 import type { PointerWindow } from './overlay/pointer-window'
 import type { ViewerManager } from './share/viewer-manager'
 import type { OverlayManager } from './overlay/overlay-manager'
+import {
+  appCapabilities,
+  getCaptureProtection,
+  setCaptureProtection,
+} from './windows/content-protection'
 
 const corners: OverlayCorner[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
 const tabs: PanelTab[] = ['channels', 'overlay', 'you', 'appearance']
@@ -212,7 +218,7 @@ export function registerIpcHandlers({
   chat,
   mirror,
   invites,
-}: IpcDependencies): void {
+}: IpcDependencies): { retryPill: () => void } {
   type Sender = Pick<IpcMainEvent, 'sender'>
   const fromPill = (event: Sender) => overlay.isPill(event.sender.id)
   const fromPanel = (event: Sender) => overlay.isPanel(event.sender.id)
@@ -225,6 +231,16 @@ export function registerIpcHandlers({
     chrome: process.versions.chrome,
   }))
   ipcMain.on(IpcChannel.AppQuit, () => app.quit())
+  ipcMain.handle(IpcChannel.AppGetCapabilities, () => appCapabilities())
+
+  // Esconder as janelas do Accord das capturas: qualquer janela lê; só o painel muda.
+  ipcMain.handle(IpcChannel.CaptureProtectionGet, () => getCaptureProtection())
+  ipcMain.on(IpcChannel.CaptureProtectionSet, (event, value: unknown) => {
+    const v = value as { hideFromCaptures?: unknown }
+    if (fromPanel(event) && typeof v?.hideFromCaptures === 'boolean') {
+      setCaptureProtection({ hideFromCaptures: v.hideFromCaptures })
+    }
+  })
 
   ipcMain.on(IpcChannel.OverlayResize, (event, size: unknown) => {
     if (fromPill(event) && isSize(size)) overlay.resizePill(size)
@@ -301,13 +317,7 @@ export function registerIpcHandlers({
 
   // Chamada: a conexão vive no pill; o main só repassa e guarda o último retrato.
   let lastCall: CallSnapshot = idleCall
-  ipcMain.on(IpcChannel.CallCommand, (event, command: unknown) => {
-    if ((fromPanel(event) || people.is(event.sender.id)) && isCallCommand(command)) {
-      overlay.sendToPill(IpcChannel.CallCommand, command)
-    }
-  })
-  ipcMain.on(IpcChannel.CallReport, (event, snapshot: CallSnapshot) => {
-    if (!fromPill(event)) return
+  const publishCall = (snapshot: CallSnapshot) => {
     lastCall = snapshot
     overlay.sendToPanel(IpcChannel.CallStateChanged, snapshot)
     people.send(IpcChannel.CallStateChanged, snapshot)
@@ -316,6 +326,19 @@ export function registerIpcHandlers({
       people.hide()
       viewers.closeAll()
     }
+  }
+  // Se o pill travar, o main recarrega e entra de novo no canal (docs/16 P1).
+  const recovery = new CallRecovery(overlay, share, () => lastCall, publishCall)
+  ipcMain.on(IpcChannel.CallCommand, (event, command: unknown) => {
+    if ((fromPanel(event) || people.is(event.sender.id)) && isCallCommand(command)) {
+      recovery.noteCommand(command)
+      overlay.sendToPill(IpcChannel.CallCommand, command)
+    }
+  })
+  ipcMain.on(IpcChannel.CallReport, (event, snapshot: CallSnapshot) => {
+    if (!fromPill(event)) return
+    const forward = recovery.filterReport(snapshot)
+    if (forward) publishCall(forward)
   })
   ipcMain.handle(IpcChannel.CallGetState, () => lastCall)
 
@@ -454,4 +477,6 @@ export function registerIpcHandlers({
 
   // Convites (accord://).
   ipcMain.handle(IpcChannel.InviteTake, (event) => (fromPanel(event) ? invites.take() : null))
+
+  return { retryPill: () => recovery.retry() }
 }

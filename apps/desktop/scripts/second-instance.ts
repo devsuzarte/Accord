@@ -4,6 +4,9 @@
  *
  * Uso (na raiz): bun run dev:second          → perfil "b"
  *                bun run dev:second carla    → perfil "carla"
+ *
+ * Para não disputar o microfone com a primeira instância:
+ *   SHARESCREEN_FAKE_MEDIA=1 bun run dev:second   (microfone falso: um bipe)
  */
 import { join } from 'node:path'
 import electronPath from 'electron'

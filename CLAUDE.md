@@ -25,7 +25,7 @@ Desktop app for voice + screen sharing as an overlay, inspired by Discord. Full 
 - Default API port: 7870 (`packages/shared/src/defaults.ts`; `normalizeServerUrl` adds the port)
 - Sharing: `src/main/share/` (picker, `setDisplayMediaRequestHandler`, native audio via loopback-capture + koffi, viewers). The pill receives voices only (`autoSubscribe: false`); the viewer has its own connection
 - Stream audio: main → MessagePort (forwarded by the preload via `window.postMessage`) → `pcm-player.worklet.js` (import with `?url&no-inline`: the CSP blocks data:)
-- Testing without Windows: `SHARESCREEN_FAKE_SHARE_AUDIO=1` (440 Hz tone instead of native audio, dev only)
+- Testing without Windows: `SHARESCREEN_FAKE_SHARE_AUDIO=1` (440 Hz tone instead of native audio, dev only; `=stall` stops after 3 s per start like a dead capture, `=mute` stops for good like a silent app). `SHARESCREEN_FAKE_MEDIA=1` = Chromium fake mic/camera (dev only; use it with `dev:second`)
 - Packages: `bun run package:server` (the compiled API starts the neighboring LiveKit with generated keys) and `package:desktop` (NSIS). Logs in `app.getPath('logs')`
 - Testing a call on your own: `bun run livekit:dev` + `bun run dev` + `bun run dev:second` (separate profile via `--profile=`)
 - Renderer dependencies only in devDependencies (Vite bundles them); desktop `dependencies` = only main's native modules
@@ -57,6 +57,11 @@ Desktop app for voice + screen sharing as an overlay, inspired by Discord. Full 
 - Stream health (M12): `pill/call/shareMonitor.ts` (sender stats every 2 s + viewer reports → `shareStats`/`shareAdvice` in the snapshot), `panel/StreamHealth.tsx`. Viewer → `POST /stream-report` → topic `accord.stream-report` only to the streamer. Codec: `ShareRequest.codec` (`auto` = H.264 if `mediaCapabilities` says powerEfficient, else VP8). Live quality change: `ActiveShare.retune` (applyConstraints + setParameters). Speed test: `GET/POST /speedtest` (8 MB max, 1 per 20 s). Firewall: `main/network/firewall.ts` (netsh check, elevated PowerShell to create)
 - Cloud hosting plan: `docs/15-cloud-server.md` (Oracle Always Free, Caddy + DuckDNS, admin key instead of loopback owner)
 - Windows: `disable-features=CalculateNativeWinOcclusion` keeps overlay windows from "freezing" after lock/idle
+- Crash recovery (docs/16 P1): `overlay-manager.ts` reloads the pill on `render-process-gone` (gives up at 2 in 5 s or 3 in 2 min, `crash-guard.ts`); `call-recovery.ts` rejoins with `CallCommand { type: 'join', resume: true }`, and the pill reuses its token from `sessionStorage` (`sharescreen.call.resume`) so the identity stays the same
+- Helper processes (P3): `process-watch.ts` logs `child-process-gone`; 2 GPU crashes in 1 min offer a restart without hardware acceleration (`gpu.json`, tray › Help)
+- Stream audio watchdog (P4): `ShareService` restarts the native capture after 10 s without chunks and sends `SHARE_AUDIO_STATUS` over the same MessagePort at 15 s (`sharing.audio = 'quiet'`)
+- Capture protection (P6/P7): never call `setContentProtection` directly; use `protectWindow(win)` (follows the "Hide Accord from captures" switch, `capture.json`) or `protectWindow(win, { always: true })`. `app.capabilities()` says what the PC supports (stream audio and capture exclusion need Windows build 19041)
+- Electron fuses are set in `electron-builder.yml` (`electronFuses`): no run-as-node, NODE_OPTIONS or --inspect in the packaged app, so Playwright `_electron` only works on dev builds; drive packaged builds over `--remote-debugging-port`
 
 ## Conventions
 - Apache 2.0 license (`LICENSE`, `NOTICE`); contributions through PRs reviewed by the maintainer (`CONTRIBUTING.md`, `.github/CODEOWNERS`, `SECURITY.md`); `main` is protected (PR + review + CI, squash only, admins bypass)

@@ -74,6 +74,7 @@ export function diagnosticReport(): string {
     `Accord ${app.getVersion()}`,
     `Electron ${process.versions.electron} · Chromium ${process.versions.chrome}`,
     `Sistema: ${process.platform} ${process.getSystemVersion()} (${process.arch})`,
+    `Aceleração de hardware: ${app.isHardwareAccelerationEnabled() ? 'ligada' : 'desligada'}`,
     `Memória do app: ${Math.round(
       app.getAppMetrics().reduce((sum, m) => sum + m.memory.workingSetSize, 0) / 1024,
     )} MB`,

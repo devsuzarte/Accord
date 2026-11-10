@@ -8,6 +8,7 @@ import {
   secureWebPreferences,
 } from '../windows/common'
 import type { OverlayManager } from './overlay-manager'
+import { protectWindow } from '../windows/content-protection'
 
 // As duas janelas têm 16px de margem transparente (sombra): -20 deixa ~12px visíveis entre elas.
 const GAP = -20
@@ -36,7 +37,7 @@ export class PeopleWindow {
       focusable: true,
       webPreferences: secureWebPreferences(),
     })
-    win.setContentProtection(true)
+    protectWindow(win)
     keepOnTop(win)
     preventMinimize(win)
     hardenNavigation(win)

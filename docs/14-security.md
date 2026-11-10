@@ -49,6 +49,19 @@ and joining again 403.
 - The firewall rule created from the Host tab only accepts private ranges and VPN ranges
   (`RemoteAddress`), never the whole internet.
 
+### Added after 0.5.0 (docs/16)
+
+- **Electron fuses** in the packaged app (`electronFuses` in `electron-builder.yml`):
+  `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` and `--inspect` no longer work on `Accord.exe`, so
+  nobody can use our signed-looking executable to run their own Node code. The app loads only from
+  `app.asar`, with embedded integrity validation, and cookies are encrypted.
+  File-protocol privileges stay on, because the audio worklet and the RNNoise wasm load over
+  `file://`.
+  Checked on a Linux build with `npx @electron/fuses read --app` and by trying each switch.
+  [Hypothesis] ASAR integrity and the unpacked native modules (`loopback-capture`, `koffi`) still
+  need one check on a Windows NSIS build, since Electron only enforces integrity on Windows and
+  macOS.
+
 ## What remains a risk
 
 - **The API and the voice signaling don't use their own encryption (HTTP and `ws://`).** The voice

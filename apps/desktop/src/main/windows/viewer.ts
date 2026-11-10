@@ -1,6 +1,7 @@
 import { BrowserWindow, nativeImage, screen } from 'electron'
 import iconPath from '../../../resources/icon.png?asset'
 import { hardenNavigation, keepOnTop, loadPage, secureWebPreferences } from './common'
+import { protectWindow } from './content-protection'
 
 /**
  * Janela de assistir transmissão — criada sob demanda pelo ViewerManager.
@@ -63,7 +64,7 @@ export function createMiniViewerWindow(
     icon: nativeImage.createFromPath(iconPath),
     webPreferences: secureWebPreferences(),
   })
-  win.setContentProtection(true)
+  protectWindow(win, { always: true })
   keepOnTop(win)
   win.once('ready-to-show', () => win.showInactive())
   win.on('page-title-updated', (event) => event.preventDefault())

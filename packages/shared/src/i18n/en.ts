@@ -575,4 +575,21 @@ export const en: Messages = {
   'viewer.quality.route.tcp': 'TCP (UDP blocked)',
   'viewer.diag.tcp':
     'The video is coming over TCP because the UDP port is blocked (on your PC or the host’s). With loss, the image freezes more.',
+  'recover.crashed': 'Accord crashed. Getting you back into the call…',
+  'recover.gaveUpTitle': 'Accord stopped responding',
+  'recover.gaveUpBody': 'It crashed several times in a row. Click to try again.',
+  'recover.gaveUp': 'Accord crashed several times in a row and left the call.',
+  'tray.reloadOverlay': 'Reload the overlay',
+  'gpu.crashTitle': 'The graphics card crashed several times',
+  'gpu.crashBody':
+    'Click to restart Accord without hardware acceleration. You can turn it back on from the tray › Help.',
+  'tray.hardwareAcceleration': 'Use hardware acceleration (restarts)',
+  'pill.streamingQuiet': 'No sound coming from the app',
+  'pill.streamingQuietHint':
+    'The app is silent or the capture stopped. Accord keeps trying to restart the capture on its own.',
+  'share.audio.windowsBuild': 'Stream audio needs Windows 10 version 2004 or newer.',
+  'overlay.hideTitle': 'Hide Accord from captures',
+  'overlay.hideText':
+    "The pill, panel, chat and people list don't show up when you stream or record your screen.",
+  'overlay.hideUnsupported': "This system can't hide windows from captures: they always show up.",
 }

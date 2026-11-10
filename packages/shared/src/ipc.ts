@@ -5,6 +5,12 @@
 export const IpcChannel = {
   AppGetInfo: 'app:get-info',
   AppQuit: 'app:quit',
+  /** O que este PC consegue fazer (docs/16 P7). */
+  AppGetCapabilities: 'app:get-capabilities',
+  /** Esconder as janelas do Accord das capturas de tela (docs/16 P6). */
+  CaptureProtectionGet: 'capture-protection:get',
+  CaptureProtectionSet: 'capture-protection:set',
+  CaptureProtectionChanged: 'capture-protection:changed',
 
   /** pill → main: tamanho medido do conteúdo (a janela acompanha o DOM). */
   OverlayResize: 'overlay:resize',
@@ -122,12 +128,41 @@ export type IpcChannel = (typeof IpcChannel)[keyof typeof IpcChannel]
 /** Marca da mensagem `window.postMessage` que entrega o MessagePort do som da transmissão. */
 export const SHARE_AUDIO_PORT_MESSAGE = 'sharescreen:share-audio-port'
 
+/**
+ * Aviso do main pelo mesmo MessagePort do som (no meio dos pedaços de PCM): o som do app
+ * parou de chegar, voltou, ou a captura não volta mais. Ver docs/16 P4.
+ */
+export const SHARE_AUDIO_STATUS = 'sharescreen:share-audio-status'
+export interface ShareAudioStatus {
+  type: typeof SHARE_AUDIO_STATUS
+  state: 'flowing' | 'quiet' | 'failed'
+  reason?: string
+}
+
 export interface AppInfo {
   name: string
   version: string
   platform: string
   electron: string
   chrome: string
+}
+
+/**
+ * O que este PC consegue fazer. A interface esconde ou explica o que não vai funcionar,
+ * em vez de deixar falhar depois (docs/16 P7).
+ */
+export interface AppCapabilities {
+  /** Transmitir o som do app ou da tela (captura nativa; Windows 10 2004+). */
+  shareAudio: boolean
+  /** As janelas do Accord podem ficar fora das capturas de tela (Windows 10 2004+ ou macOS). */
+  captureExclusion: boolean
+  /** Aceleração de hardware ligada neste início (pode ter sido desligada pela bandeja). */
+  hardwareAcceleration: boolean
+}
+
+export interface CaptureProtection {
+  /** Pill, painel, chat e lista de pessoas ficam fora das capturas (padrão: sim). */
+  hideFromCaptures: boolean
 }
 
 export type PanelTab = 'channels' | 'overlay' | 'you' | 'appearance'

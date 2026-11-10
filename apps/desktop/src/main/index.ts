@@ -17,6 +17,7 @@ import { PointerWindow } from './overlay/pointer-window'
 import { ViewerManager } from './share/viewer-manager'
 import { createTray } from './tray'
 import { InviteService } from './invites'
+import { applyHardwareAccelerationChoice, watchChildProcesses } from './process-watch'
 import { Updater, updatesEnabled } from './updater'
 
 /**
@@ -29,6 +30,18 @@ const profile = process.argv
   .replace(/[^a-zA-Z0-9_-]/g, '')
 if (profile) {
   app.setPath('userData', join(app.getPath('appData'), `Accord-${profile}`))
+}
+
+// GPU que trava sem parar: a pessoa pode ter escolhido rodar sem aceleração (docs/16 P3).
+applyHardwareAccelerationChoice()
+watchChildProcesses()
+
+// Só em desenvolvimento: SHARESCREEN_FAKE_MEDIA=1 troca microfone e câmera por dispositivos
+// falsos do Chromium (um bipe e uma imagem de teste). Duas instâncias no mesmo PC deixam de
+// brigar pelo microfone, e dá para testar sem nenhum dispositivo (docs/16 P5).
+if (!app.isPackaged && process.env.SHARESCREEN_FAKE_MEDIA === '1') {
+  app.commandLine.appendSwitch('use-fake-device-for-media-stream')
+  console.info('[app] microfone e câmera falsos (SHARESCREEN_FAKE_MEDIA=1)')
 }
 
 // O áudio da chamada toca sem precisar de um clique antes (política de autoplay do Chromium).
@@ -90,7 +103,7 @@ if (!app.requestSingleInstanceLock()) {
     mirror = sessionMirror
     host = hostService
     const chat = new ChatWindow(overlay, (channel, payload) => overlay.sendToPill(channel, payload))
-    registerIpcHandlers({
+    const { retryPill } = registerIpcHandlers({
       overlay,
       hotkeys,
       share,
@@ -105,7 +118,7 @@ if (!app.requestSingleInstanceLock()) {
       mirror: sessionMirror,
       invites,
     })
-    const tray = createTray(overlay, profile, updater, () => viewers.unlockAll())
+    const tray = createTray(overlay, profile, updater, () => viewers.unlockAll(), retryPill)
     updater.onReady = tray.rebuild
     settings.onLanguageChange = tray.rebuild
     invites.register()

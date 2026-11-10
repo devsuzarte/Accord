@@ -210,6 +210,12 @@
   transform: translateX(16px);
 }
 
+/* Travado: o sistema não permite (ex.: esconder das capturas no Linux). */
+.switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ── Mini tela com os 4 cantos ───────────────────────── */
 
 .screen {

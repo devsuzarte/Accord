@@ -3,6 +3,7 @@ import { app } from 'electron'
 import type Koffi from 'koffi'
 import type { MessageKey, ShareKind } from '@sharescreen/shared'
 import { tm } from '../i18n'
+import { windowsBuildAtLeast } from '../system'
 
 /**
  * Som da transmissão capturado no Windows pelo "process loopback" do WASAPI
@@ -31,15 +32,24 @@ let getWindowPid: ((hwnd: bigint) => number) | null = null
 /**
  * Só para testes em desenvolvimento: SHARESCREEN_FAKE_SHARE_AUDIO=1 troca a captura nativa
  * por um tom de 440 Hz, para validar o caminho do som em qualquer sistema.
+ * Para testar o vigia do som (docs/16 P4):
+ *  - `stall`: o tom para 3 s depois de cada início, como uma captura que morreu (reiniciar resolve);
+ *  - `mute`: o tom para 3 s depois do primeiro início e não volta, como um app em silêncio.
  */
-const fakeAudio = !app.isPackaged && process.env.SHARESCREEN_FAKE_SHARE_AUDIO === '1'
+const fakeMode = app.isPackaged ? undefined : process.env.SHARESCREEN_FAKE_SHARE_AUDIO
+const fakeAudio = fakeMode === '1' || fakeMode === 'stall' || fakeMode === 'mute'
+let fakeMutedAt: number | null = null
 
 class FakeToneCapture implements LoopbackCapture {
   private timer: NodeJS.Timeout | null = null
   private phase = 0
   private run(callback: (chunk: Buffer) => void) {
     const frames = 480 // 10 ms a 48 kHz
+    if (fakeMode === 'mute') fakeMutedAt ??= Date.now() + 3000
+    const stallAt =
+      fakeMode === 'stall' ? Date.now() + 3000 : fakeMode === 'mute' ? fakeMutedAt! : Infinity
     this.timer = setInterval(() => {
+      if (Date.now() >= stallAt) return
       const chunk = Buffer.alloc(frames * 4)
       for (let i = 0; i < frames; i++) {
         const sample = Math.round(Math.sin(this.phase) * 0.2 * 32767)
@@ -71,6 +81,12 @@ function load(): void {
   }
   if (process.platform !== 'win32') {
     loadError = 'share.audio.windowsOnly'
+    return
+  }
+  // O "process loopback" do WASAPI: a Microsoft documenta o build 20348, mas funciona desde o
+  // Windows 10 2004 (19041), como o GStreamer também assume. Antes disso, nem tenta.
+  if (!windowsBuildAtLeast(19041)) {
+    loadError = 'share.audio.windowsBuild'
     return
   }
   try {
