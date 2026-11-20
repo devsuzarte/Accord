@@ -21,7 +21,7 @@ const types = {
 type Ext = keyof typeof types
 
 /** Confere o tipo pelos primeiros bytes (não confia no que o cliente diz). */
-function sniff(bytes: Uint8Array): Ext | null {
+export function sniff(bytes: Uint8Array): Ext | null {
   const b = bytes
   if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'png'
   if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpg'

@@ -3,6 +3,9 @@ import { POINTER_TOPIC } from '@sharescreen/shared'
 import {
   Lock,
   Maximize,
+  PanelBottomClose,
+  PanelBottomOpen,
+  RotateCw,
   Maximize2,
   Minimize,
   PictureInPicture2,
@@ -27,6 +30,8 @@ import { Pings } from '../pointer/Pings'
 import { isLocallyMuted, onLocalMutesChange, readLocalMutes } from '../shared/localMutes'
 import { t as translate, useT } from '../shared/i18n'
 import type { LocalMutes } from '../shared/localMutes'
+import { useCallSnapshot } from '../shared/useCallSnapshot'
+import { PeopleStrip, StreamerCard, readStripOpen, saveStripOpen } from './PeopleStrip'
 import { QualityBadge, QualityPanel } from './QualityPanel'
 import {
   applyQualityChoice,
@@ -36,7 +41,11 @@ import {
 } from './quality'
 import type { QualityChoice } from './quality'
 
-type Phase = 'connecting' | 'waiting' | 'live' | 'ended' | 'error'
+/**
+ * paused = a pessoa parou de transmitir (a janela fica aberta e volta sozinha) ·
+ * left = a pessoa saiu da call (volta se ela entrar de novo com o mesmo nome).
+ */
+type Phase = 'connecting' | 'waiting' | 'live' | 'paused' | 'left' | 'error'
 
 const VOLUME_KEY = 'sharescreen.viewer.volume'
 
@@ -108,6 +117,10 @@ export function Viewer() {
     height: number
   } | null>(null)
   const [statsOpen, setStatsOpen] = useState(false)
+  /** Identidade de quem esta janela assiste (muda se a pessoa sair e voltar). */
+  const [watching, setWatching] = useState<string | null>(null)
+  const [stripOpen, setStripOpen] = useState(readStripOpen)
+  const call = useCallSnapshot()
   const stats = useStreamQuality(
     screen?.track ?? null,
     screen?.pub ?? null,
@@ -149,6 +162,7 @@ export function Viewer() {
         return
       }
       setTarget(who)
+      setWatching(who.identity)
       if (who.mini) setMini({ locked: false, opacity: 1 })
 
       let joined: JoinResponse
@@ -179,15 +193,24 @@ export function Viewer() {
       const r = new Room({ adaptiveStream: true, dynacast: true })
       room = r
 
+      // Quem transmite pode sair e voltar (identidade nova, mesmo nome): a janela segue.
+      let targetId = who.identity
+      const follow = (participant: RemoteParticipant) => {
+        if (participant.identity === targetId || participant.name !== who.name) return
+        targetId = participant.identity
+        if (access.current) access.current.target = targetId
+        setWatching(targetId)
+      }
       const subscribeTo = (participant: RemoteParticipant) => {
-        if (participant.identity !== who.identity) return
+        follow(participant)
+        if (participant.identity !== targetId) return
         participant.trackPublications.forEach((pub) => {
           if (wanted(pub.source)) pub.setSubscribed(true)
         })
       }
       // Câmera desligada fica publicada mas "mutada": conta como não estar no ar.
       const isStreaming = () => {
-        const pub = r.remoteParticipants.get(who.identity)?.getTrackPublication(videoSource)
+        const pub = r.remoteParticipants.get(targetId)?.getTrackPublication(videoSource)
         return !!pub && !(who.source === 'camera' && pub.isMuted)
       }
 
@@ -195,13 +218,17 @@ export function Viewer() {
         .on(
           RoomEvent.TrackPublished,
           (pub: RemoteTrackPublication, participant: RemoteParticipant) => {
-            if (participant.identity === who.identity && wanted(pub.source)) pub.setSubscribed(true)
+            follow(participant)
+            if (participant.identity === targetId && wanted(pub.source)) {
+              pub.setSubscribed(true)
+              if (pub.source === videoSource) setPhase('connecting')
+            }
           },
         )
         .on(
           RoomEvent.TrackSubscribed,
           (track: RemoteTrack, pub: RemoteTrackPublication, participant: RemoteParticipant) => {
-            if (participant.identity !== who.identity) return
+            if (participant.identity !== targetId) return
             if (track.source === videoSource && videoRef.current) {
               track.attach(videoRef.current)
               applyQualityChoice(pub, readQualityChoice())
@@ -222,24 +249,29 @@ export function Viewer() {
         .on(
           RoomEvent.TrackUnpublished,
           (pub: RemoteTrackPublication, participant: RemoteParticipant) => {
-            if (participant.identity === who.identity && pub.source === videoSource) {
-              setPhase('ended')
+            if (participant.identity === targetId && pub.source === videoSource) {
+              // Parou de transmitir: a janela fica esperando (não fecha).
+              setScreen(null)
+              setPhase('paused')
             }
           },
         )
         // Câmera: desligar = "mutar" a publicação; religar volta na mesma janela.
         .on(RoomEvent.TrackMuted, (pub: TrackPublication, participant: Participant) => {
-          if (participant.identity === who.identity && pub.source === videoSource) {
-            setPhase('waiting')
+          if (participant.identity === targetId && pub.source === videoSource) {
+            setPhase('paused')
           }
         })
         .on(RoomEvent.TrackUnmuted, (pub: TrackPublication, participant: Participant) => {
-          if (participant.identity === who.identity && pub.source === videoSource) {
+          if (participant.identity === targetId && pub.source === videoSource) {
             setPhase('live')
           }
         })
         .on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
-          if (participant.identity === who.identity) setPhase('ended')
+          if (participant.identity === targetId) {
+            setScreen(null)
+            setPhase('left')
+          }
         })
         // Marcadores de quem assiste a mesma transmissão (só os que vêm do servidor).
         .on(
@@ -248,7 +280,7 @@ export function Viewer() {
             if (participant || topic !== POINTER_TOPIC) return
             try {
               const ping = JSON.parse(new TextDecoder().decode(payload)) as PointerPing
-              if (ping.type === 'ping' && ping.target === who.identity) {
+              if (ping.type === 'ping' && ping.target === targetId) {
                 for (const listener of pingListeners.current) listener(ping)
               }
             } catch {
@@ -258,6 +290,7 @@ export function Viewer() {
         )
         .on(RoomEvent.Disconnected, () => {
           if (!cancelled) {
+            setScreen(null)
             setPhase('error')
             setMessage(translate('viewer.dropped'))
           }
@@ -274,8 +307,12 @@ export function Viewer() {
         void r.disconnect()
         return
       }
-      const participant = r.remoteParticipants.get(who.identity)
-      if (participant) subscribeTo(participant)
+      r.remoteParticipants.forEach(subscribeTo)
+      const participant = r.remoteParticipants.get(targetId)
+      if (!participant) {
+        setPhase('left')
+        return
+      }
       setPhase(isStreaming() ? 'connecting' : 'waiting')
     }
 
@@ -285,24 +322,6 @@ export function Viewer() {
       void room?.disconnect()
     }
   }, [])
-
-  // A transmissão acabou (ou a conexão caiu): a janela fecha sozinha em alguns segundos.
-  const [closingIn, setClosingIn] = useState<number | null>(null)
-  useEffect(() => {
-    if (phase !== 'ended' && phase !== 'error') return
-    let left = 4
-    const tick = () => {
-      setClosingIn(left)
-      if (left <= 0) window.close()
-      left -= 1
-    }
-    const first = setTimeout(tick, 0)
-    const timer = setInterval(tick, 1000)
-    return () => {
-      clearTimeout(first)
-      clearInterval(timer)
-    }
-  }, [phase])
 
   // "Mutar áudio (para mim)" na lista de pessoas vale para esta janela também.
   useEffect(() => {
@@ -457,55 +476,72 @@ export function Viewer() {
       data-locked={mini?.locked || undefined}
       data-chrome={chromeVisible || statsOpen || phase !== 'live' || undefined}
     >
-      <video
-        ref={videoRef}
-        className="viewer__video"
-        autoPlay
-        playsInline
-        muted
-        title={phase === 'live' && !mini?.locked && !cameraMode ? t('viewer.pointHint') : undefined}
-        onClick={point}
-        onDoubleClick={mini ? undefined : toggleFullscreen}
-        hidden={phase !== 'live'}
-      />
-      <audio ref={audioRef} autoPlay />
-      {phase === 'live' && frame && !cameraMode && (
-        <div className="viewer__pings" style={frame}>
-          <Pings source={pingSource} />
-        </div>
-      )}
-
-      {mini && (
-        <MiniBar
-          state={mini}
-          name={target?.name ?? ''}
-          unlockKey={unlockKey}
-          dragHandlers={dragHandlers}
+      <div className="viewer__stage">
+        <video
+          ref={videoRef}
+          className="viewer__video"
+          autoPlay
+          playsInline
+          muted
+          title={
+            phase === 'live' && !mini?.locked && !cameraMode ? t('viewer.pointHint') : undefined
+          }
+          onClick={point}
+          onDoubleClick={mini ? undefined : toggleFullscreen}
+          hidden={phase !== 'live'}
         />
-      )}
+        <audio ref={audioRef} autoPlay />
+        {phase === 'live' && frame && !cameraMode && (
+          <div className="viewer__pings" style={frame}>
+            <Pings source={pingSource} />
+          </div>
+        )}
 
-      {phase !== 'live' && (
-        <div className="viewer__state" role="status">
-          {phase === 'connecting' && <p>{t('viewer.connecting')}</p>}
-          {phase === 'waiting' && (
-            <p>
-              {cameraMode
-                ? t('viewer.cameraOff', { name: target?.name ?? t('viewer.thisPerson') })
-                : t('viewer.notStreaming', { name: target?.name ?? t('viewer.thisPerson') })}
-            </p>
-          )}
-          {phase === 'ended' && (
-            <p>
-              {cameraMode
-                ? t('viewer.cameraEnded', { name: target?.name ?? t('viewer.thisPerson') })
-                : t('viewer.ended', { name: target?.name ?? t('viewer.thisPersonLower') })}
-            </p>
-          )}
-          {phase === 'error' && <p>{message}</p>}
-          {(phase === 'ended' || phase === 'error') && closingIn !== null && (
-            <p className="viewer__closing">{t('viewer.closing', { n: Math.max(0, closingIn) })}</p>
-          )}
-        </div>
+        {mini && (
+          <MiniBar
+            state={mini}
+            name={target?.name ?? ''}
+            unlockKey={unlockKey}
+            dragHandlers={dragHandlers}
+          />
+        )}
+
+        {phase !== 'live' &&
+          (phase === 'paused' || phase === 'left' || phase === 'waiting' ? (
+            <StreamerCard
+              person={call.participants.find((p) => p.userId === watching) ?? null}
+              name={target?.name ?? t('viewer.thisPerson')}
+              phase={phase}
+              compact={!!mini}
+              camera={cameraMode}
+            />
+          ) : (
+            <div className="viewer__state" role="status">
+              {phase === 'connecting' && <p>{t('viewer.connecting')}</p>}
+              {phase === 'error' && (
+                <>
+                  <p>{message}</p>
+                  <span className="viewer__state-actions">
+                    <button
+                      type="button"
+                      className="viewer__pill"
+                      onClick={() => location.reload()}
+                    >
+                      <RotateCw size={15} aria-hidden />
+                      {t('viewer.retry')}
+                    </button>
+                    <button type="button" className="viewer__pill" onClick={() => window.close()}>
+                      {t('viewer.close')}
+                    </button>
+                  </span>
+                </>
+              )}
+            </div>
+          ))}
+      </div>
+
+      {!mini && stripOpen && call.participants.length > 0 && (
+        <PeopleStrip people={call.participants} watching={watching} />
       )}
 
       <header className="viewer__bar" hidden={!!mini}>
@@ -548,6 +584,21 @@ export function Viewer() {
             phase === 'live' &&
             !cameraMode && <span className="viewer__note">{t('viewer.noAudio')}</span>
           )}
+          <button
+            type="button"
+            className="viewer__button"
+            aria-pressed={stripOpen}
+            aria-label={stripOpen ? t('viewer.strip.hide') : t('viewer.strip.show')}
+            title={stripOpen ? t('viewer.strip.hide') : t('viewer.strip.show')}
+            onClick={() => {
+              setStripOpen((open) => {
+                saveStripOpen(!open)
+                return !open
+              })
+            }}
+          >
+            {stripOpen ? <PanelBottomClose size={18} /> : <PanelBottomOpen size={18} />}
+          </button>
           <button
             type="button"
             className="viewer__button"

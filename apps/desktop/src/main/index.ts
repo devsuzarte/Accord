@@ -10,6 +10,8 @@ import { HostService } from './network/host-service'
 import { SessionMirror } from './network/session-mirror'
 import { restrictPermissions } from './windows/permissions'
 import { ChatWindow } from './overlay/chat-window'
+import { MusicPlayerWindow } from './music/player-window'
+import { identifyToYouTube } from './music/youtube'
 import { PeopleWindow } from './overlay/people-window'
 import { SettingsStore } from './settings/settings-store'
 import { ShareService } from './share/share-service'
@@ -99,10 +101,18 @@ if (!app.requestSingleInstanceLock()) {
     // Sobra de uma sessão anterior (o app fechou sem sair da call): nada fica guardado.
     sessionMirror.clear()
     restrictPermissions()
-    const hostService = new HostService(sessionMirror)
+    const hostService = new HostService(sessionMirror, () => settings.getGifs())
     mirror = sessionMirror
     host = hostService
-    const chat = new ChatWindow(overlay, (channel, payload) => overlay.sendToPill(channel, payload))
+    identifyToYouTube()
+    const chat = new ChatWindow(
+      overlay,
+      (channel, payload) => overlay.sendToPill(channel, payload),
+      () => settings.getTheme(),
+    )
+    settings.onThemeChange = (theme) => chat.applyTheme(theme)
+    const music = new MusicPlayerWindow()
+    music.onOpenChange = (open) => chat.setPlayerOpen(open)
     const { retryPill } = registerIpcHandlers({
       overlay,
       hotkeys,
@@ -117,6 +127,7 @@ if (!app.requestSingleInstanceLock()) {
       chat,
       mirror: sessionMirror,
       invites,
+      music,
     })
     const tray = createTray(overlay, profile, updater, () => viewers.unlockAll(), retryPill)
     updater.onReady = tray.rebuild

@@ -2,7 +2,7 @@ import { tm } from '../i18n'
 import { screen } from 'electron'
 import type { BrowserWindow } from 'electron'
 import { IpcChannel } from '@sharescreen/shared'
-import type { MiniViewerState, ViewerTarget } from '@sharescreen/shared'
+import type { CallSnapshot, MiniViewerState, ViewerTarget } from '@sharescreen/shared'
 import { createMiniViewerWindow, createViewerWindow, MINI_WIDTHS } from '../windows/viewer'
 
 interface Entry {
@@ -128,6 +128,14 @@ export class ViewerManager {
     entry.win.setIgnoreMouseEvents(entry.mini.locked, { forward: true })
     entry.win.setOpacity(entry.mini.opacity)
     entry.win.webContents.send(IpcChannel.ViewerMiniState, entry.mini)
+  }
+
+  /** Quem está na call (a faixa de pessoas embaixo da transmissão). */
+  reportCall(snapshot: CallSnapshot): void {
+    for (const entry of this.byIdentity.values()) {
+      if (!entry.win.isDestroyed())
+        entry.win.webContents.send(IpcChannel.CallStateChanged, snapshot)
+    }
   }
 
   /** Saiu da chamada: nenhuma transmissão continua aberta na tela. */

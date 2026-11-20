@@ -3,9 +3,16 @@ import { randomBytes } from 'node:crypto'
 import type { ChildProcess } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { app, BrowserWindow, session } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { DEFAULT_API_PORT, HOST_KEY_HEADER, IpcChannel } from '@sharescreen/shared'
-import type { HostAddress, HostStartOptions, HostState, HostStopMode } from '@sharescreen/shared'
+import type {
+  GifSettings,
+  HostAddress,
+  HostStartOptions,
+  HostState,
+  HostStopMode,
+} from '@sharescreen/shared'
+import { addHeaderRule } from './request-headers'
 import type { SessionMirror } from './session-mirror'
 import { allowFirewall, firewallState } from './firewall'
 import { localInterfaces } from './interfaces'
@@ -47,13 +54,14 @@ export class HostService {
    */
   private readonly hostKey = randomBytes(24).toString('base64url')
 
-  constructor(private readonly mirror: SessionMirror) {
+  constructor(
+    private readonly mirror: SessionMirror,
+    private readonly gifs: () => GifSettings | null = () => null,
+  ) {
     const filter = {
       urls: [`http://127.0.0.1:${DEFAULT_API_PORT}/*`, `http://localhost:${DEFAULT_API_PORT}/*`],
     }
-    session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
-      callback({ requestHeaders: { ...details.requestHeaders, [HOST_KEY_HEADER]: this.hostKey } })
-    })
+    addHeaderRule(filter.urls, () => ({ [HOST_KEY_HEADER]: this.hostKey }))
   }
 
   private hostHeaders(extra: Record<string, string> = {}): Record<string, string> {
@@ -94,6 +102,22 @@ export class HostService {
   async start(options: HostStartOptions = {}): Promise<HostState> {
     await this.run(options)
     return this.getState()
+  }
+
+  /** Chave dos GIFs mudou no painel: vale na hora para o servidor aberto aqui. */
+  async applyGifs(settings: GifSettings | null): Promise<boolean> {
+    if (this.state.status !== 'running') return true
+    try {
+      const response = await fetch(`${LOCAL_URL}/gifs/config`, {
+        method: 'POST',
+        headers: this.hostHeaders({ 'content-type': 'application/json' }),
+        body: JSON.stringify({ config: settings }),
+        signal: AbortSignal.timeout(3000),
+      })
+      return response.ok
+    } catch {
+      return false
+    }
   }
 
   /** Troca a senha do servidor aberto aqui (só o próprio PC pode). */
@@ -153,6 +177,11 @@ export class HostService {
     const password = options.password?.trim() || ''
     if (password) command.env.SHARESCREEN_PASSWORD = password
     command.env.SHARESCREEN_HOST_KEY = this.hostKey
+    const gifs = this.gifs()
+    if (gifs) {
+      command.env.ACCORD_GIF_PROVIDER = gifs.provider
+      command.env.ACCORD_GIF_KEY = gifs.key
+    }
     if (options.restore && this.mirror.hasCopy()) {
       // Migração: o servidor novo continua a sessão a partir da cópia deste PC.
       this.mirror.pause()

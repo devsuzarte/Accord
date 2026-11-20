@@ -112,6 +112,30 @@ export const IpcChannel = {
   ChatSetPrefs: 'chat:set-prefs',
   ChatPrefsChanged: 'chat:prefs-changed',
   ChatUnreadChanged: 'chat:unread-changed',
+  /** Abrir a janela de chat numa área (conversa ou música). */
+  ChatOpen: 'chat:open',
+  ChatGetMode: 'chat:get-mode',
+  ChatGetView: 'chat:get-view',
+  ChatViewChanged: 'chat:view-changed',
+
+  /** pill → main: estado da sala de música; main → chat e player. */
+  MusicReport: 'music:report',
+  MusicGetState: 'music:get-state',
+  MusicStateChanged: 'music:state-changed',
+  /** Abrir/fechar o player (janela pequena, sempre visível, com o vídeo do YouTube). */
+  MusicOpenPlayer: 'music:open-player',
+  MusicClosePlayer: 'music:close-player',
+  MusicPlayerChanged: 'music:player-changed',
+  MusicPlayerGet: 'music:player-get',
+
+  /** Sons do app (pacote, volume, ações mudas e sons próprios). */
+  SoundsGet: 'sounds:get',
+  SoundsSet: 'sounds:set',
+  SoundsChanged: 'sounds:changed',
+
+  /** Chave da busca de GIFs de quem hospeda (só o painel). */
+  GifsGetSettings: 'gifs:get-settings',
+  GifsSetSettings: 'gifs:set-settings',
   SessionMirror: 'session:mirror',
   InviteReceived: 'invite:received',
   InviteTake: 'invite:take',
@@ -223,6 +247,9 @@ export interface VoiceHotkeys {
 
 /** Como a janela de chat aparece: aberta (com o campo de texto) ou mínima (só as mensagens rolando). */
 export type ChatMode = 'expanded' | 'mini'
+
+/** Área da janela de chat completa. */
+export type ChatView = 'chat' | 'music'
 
 export interface ChatPrefs {
   /** Mostrar as mensagens rolando na tela (modo mínimo) durante a chamada. */

@@ -7,6 +7,7 @@ import { avatarRoutes } from './routes/avatars'
 import { joinRoutes } from './routes/join'
 import { meRoutes } from './routes/me'
 import { moderateRoutes } from './routes/moderate'
+import { musicRoutes } from './routes/music'
 import { pointerRoutes } from './routes/pointer'
 import { streamRoutes } from './routes/stream'
 import { sessionRoutes } from './routes/session'
@@ -45,6 +46,7 @@ export const app = env.openJoin
       .use(pointerRoutes)
       .use(streamRoutes)
       .use(sessionRoutes)
+      .use(musicRoutes)
   : base
 
 export type App = typeof app

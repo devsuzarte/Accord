@@ -38,7 +38,7 @@ Desktop app for voice + screen sharing as an overlay, inspired by Discord. Full 
 - Profile and theme: `src/main/settings/settings-store.ts` (profile.json, theme.json in userData) → `ProfileChanged`/`ThemeChanged` to every window. Every page calls `startTheme()`; new CSS colors = tokens/`color-mix`, never fixed hex
 - Languages: new UI text ALWAYS in both dictionaries (`packages/shared/src/i18n/pt-BR.ts` and `en.ts`, same keys); in the renderer `useT()`, outside React `translateNow()`; in main `src/main/i18n.ts`. API errors come back as codes, not sentences
 - Hosting and discovery: `src/main/network/` (HostService, DiscoveryService). Discovery port 7871/UDP (`DEFAULT_DISCOVERY_PORT`); the server confirms with `GET /info`
-- RNNoise: `pill/call/noise.ts` (wasm and worklet with `?url&no-inline`; the pill CSP has `'wasm-unsafe-eval'`). Sounds: `pill/call/sounds.ts` (WebAudio, no files)
+- RNNoise: `pill/call/noise.ts` (wasm and worklet with `?url&no-inline`; the pill CSP has `'wasm-unsafe-eval'`). Sounds: `renderer/shared/sounds.ts` (WebAudio synth + custom files, see docs/17)
 
 - Product name: **Accord** (installer, windows, tray, text). Internal packages stay `@sharescreen/*`, and localStorage keys and the discovery protocol keep the `sharescreen` prefix
 - Icons: `apps/desktop/resources/` (original `logo.svg`, app `icon.png`/`icon.ico`, `tray.png`/`tray@2x.png`)
@@ -65,6 +65,14 @@ Desktop app for voice + screen sharing as an overlay, inspired by Discord. Full 
 - Stream audio watchdog (P4): `ShareService` restarts the native capture after 10 s without chunks and sends `SHARE_AUDIO_STATUS` over the same MessagePort at 15 s (`sharing.audio = 'quiet'`)
 - Capture protection (P6/P7): never call `setContentProtection` directly; use `protectWindow(win)` (follows the "Hide Accord from captures" switch, `capture.json`) or `protectWindow(win, { always: true })`. `app.capabilities()` says what the PC supports (stream audio and capture exclusion need Windows build 19041)
 - Electron fuses are set in `electron-builder.yml` (`electronFuses`): no run-as-node, NODE_OPTIONS or --inspect in the packaged app, so Playwright `_electron` only works on dev builds; drive packaged builds over `--remote-debugging-port`
+
+- Chat window (docs/17): `overlay/chat-window.ts` has TWO windows on the same `chat` page: full (real window, `titleBarStyle: 'hidden'` + `titleBarOverlay` from the theme; X only hides) and mini (overlay, click-through). The page asks `chat.getMode()`/`getView()`. Full UI in `renderer/chat/full/` (`ChatApp` sidebar + `Conversation` + `MusicRoom`, `markdown.tsx`, `EmojiPicker`, `GifPicker`)
+- Chat extras: reactions (`POST /chat/react`), replies (`replyTo`), GIFs (`gif: { provider, id }` — the server only accepts ids its own search returned, `services/gifs.ts`), server emojis (`services/emojis.ts`, kept in `SHARESCREEN_DATA_DIR/emojis`, `:name:`). GIF key: KLIPY or GIPHY, set by the host in Channels → Host (`gifs.json` in userData → env `ACCORD_GIF_PROVIDER/KEY`, live via `POST /gifs/config`). Tenor's API is dead (June 2026)
+- Music room (docs/17): server keeps queue + clock (`services/music.ts`, topic `accord.music`); pill `call/music.ts` → main → chat window and the player window (`main/music/player-window.ts`, page `music`, official YouTube IFrame API, video always visible, content protection). `main/music/youtube.ts` sets the Referer for the embed (file:// has none → error 153). Spotify = only a Jam invite link, no API. Never extract/cache YouTube audio
+- Only ONE `onBeforeSendHeaders` per session: add rules through `main/network/request-headers.ts`
+- Permissions: `windows/permissions.ts` checks the requesting frame (third-party iframes get nothing)
+- Sounds: `renderer/shared/sounds.ts` (synth packs accord/soft/arcade + custom files), settings `sounds.json` in userData (`SoundSettings`), panel `SoundSettings.tsx`. New sound = `SOUND_NAMES` + recipe + `sounds.name.*` in both dictionaries
+- Viewer: never auto-closes; `paused`/`left` show `StreamerCard`; follows the streamer by name if they rejoin; bottom `PeopleStrip` from the `CallSnapshot` (main sends it to viewers), hideable. Clicking a streaming person (people list, chat sidebar, strip) sends `watch`
 
 ## Conventions
 - Apache 2.0 license (`LICENSE`, `NOTICE`); contributions through PRs reviewed by the maintainer (`CONTRIBUTING.md`, `.github/CODEOWNERS`, `SECURITY.md`); `main` is protected (PR + review + CI, squash only, admins bypass)

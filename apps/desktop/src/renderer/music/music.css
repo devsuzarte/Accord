@@ -1,0 +1,158 @@
+/*
+ * Player da sala de música: janela pequena, escura, com o vídeo do YouTube sempre à mostra
+ * (regra do YouTube) e os controles do Accord embaixo.
+ */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg-floating);
+}
+
+.player {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100%;
+  color: var(--text-normal);
+  font-family: var(--font-sans);
+}
+
+.player__bar {
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  padding: 0 4px 0 12px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--material-border);
+}
+
+.player__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.player__video {
+  position: relative;
+  min-height: 200px;
+  background: #000;
+}
+
+.player__frame,
+.player__frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.player__state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  background: color-mix(in srgb, #000 82%, var(--bg-tertiary));
+}
+
+.player__state p {
+  max-width: 32ch;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.player__controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 8px 8px 12px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--material-border);
+}
+
+.player__now {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 1px;
+}
+
+.player__title {
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-strong);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.player__meta {
+  overflow: hidden;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.player__icon {
+  -webkit-app-region: no-drag;
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--interactive);
+  cursor: pointer;
+}
+
+.player__icon:hover:not(:disabled) {
+  background: var(--bg-modifier-hover);
+  color: var(--interactive-hover);
+}
+
+.player__icon:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.player__volume {
+  display: inline-flex;
+  align-items: center;
+}
+
+.player__volume input {
+  width: 64px;
+  accent-color: var(--brand);
+}
+
+.spin {
+  animation: player-spin 0.9s linear infinite;
+}
+
+@keyframes player-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

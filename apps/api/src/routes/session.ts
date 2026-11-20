@@ -4,12 +4,16 @@ import {
   CHAT_MAX_FILE_BYTES,
   CHAT_MAX_TEXT,
   CHAT_TOPIC,
+  CUSTOM_EMOJI_MAX_BYTES,
   SESSION_TOPIC,
 } from '@sharescreen/shared'
 import { Elysia, t } from 'elysia'
 import { DataPacket_Kind } from 'livekit-server-sdk'
 import { callerOf } from '../services/auth'
 import { ROOM, roomService } from '../services/livekit'
+import { addEmoji, listEmojis, readEmoji, removeEmoji } from '../services/emojis'
+import { gifStatus, knownGif, searchGifs, setGifConfig } from '../services/gifs'
+import { roleOf } from '../services/roles'
 import { isHostRequest, overLimit } from '../services/security'
 import {
   addFile,
@@ -21,6 +25,7 @@ import {
   rotateInvite,
   setPassword,
   snapshot,
+  toggleReaction,
 } from '../services/session'
 
 const caller = (headers: Record<string, string | undefined>) => callerOf(headers)
@@ -43,8 +48,8 @@ async function avatarOf(identity: string): Promise<string | null> {
   }
 }
 
-/** Manda a mensagem nova para todos na sala, pelos dados do LiveKit. */
-async function broadcast(event: ChatEvent): Promise<void> {
+/** Manda a mensagem nova (ou reação, ou lista de emojis) para todos, pelos dados do LiveKit. */
+export async function broadcast(event: ChatEvent): Promise<void> {
   const data = new TextEncoder().encode(JSON.stringify(event))
   await roomService()
     .sendData(ROOM, data, DataPacket_Kind.RELIABLE, { topic: CHAT_TOPIC })
@@ -76,10 +81,17 @@ export const sessionRoutes = new Elysia()
         set.status = 429
         return { error: 'slow-down' }
       }
+      // GIF: só um que a busca deste servidor devolveu (o app manda o id, não o link).
+      const gif = body.gif ? knownGif(body.gif.provider, body.gif.id) : null
+      if (body.gif && !gif) {
+        set.status = 400
+        return { error: 'bad-message' satisfies SessionError }
+      }
       const result = addMessage(
         { identity: who.identity, name: who.name, avatar: await avatarOf(who.identity) },
         body.text,
         body.attachments ?? [],
+        { replyTo: body.replyTo ?? null, gif },
       )
       if (typeof result === 'string') {
         set.status = 400
@@ -94,6 +106,164 @@ export const sessionRoutes = new Elysia()
         attachments: t.Optional(
           t.Array(t.String({ maxLength: 64 }), { maxItems: CHAT_MAX_ATTACHMENTS }),
         ),
+        replyTo: t.Optional(t.Union([t.String({ maxLength: 32 }), t.Null()])),
+        gif: t.Optional(
+          t.Union([
+            t.Object({
+              provider: t.Union([t.Literal('klipy'), t.Literal('giphy')]),
+              id: t.String({ maxLength: 80 }),
+            }),
+            t.Null(),
+          ]),
+        ),
+      }),
+    },
+  )
+  // Reagir (ou tirar a reação) numa mensagem.
+  .post(
+    '/chat/react',
+    async ({ headers, body, set }) => {
+      const who = await caller(headers)
+      if ('error' in who) {
+        set.status = who.status
+        return { error: who.error }
+      }
+      if (overLimit(`react:${who.identity}`, 20, 10_000)) {
+        set.status = 429
+        return { error: 'slow-down' satisfies SessionError }
+      }
+      const result = toggleReaction(body.id, body.emoji, who.identity)
+      if (typeof result === 'string') {
+        set.status = result === 'not-found' ? 404 : 400
+        return { error: result }
+      }
+      await broadcast({ type: 'reactions', id: body.id, reactions: result })
+      return { reactions: result }
+    },
+    { body: t.Object({ id: t.String({ maxLength: 32 }), emoji: t.String({ maxLength: 40 }) }) },
+  )
+  // Emojis personalizados do servidor (ficam guardados no PC de quem hospeda).
+  .get('/emojis', async ({ headers, set }) => {
+    const who = await caller(headers)
+    if ('error' in who) {
+      set.status = who.status
+      return { error: who.error }
+    }
+    return listEmojis()
+  })
+  .get('/emojis/:file', ({ params, set }) => {
+    const found = readEmoji(params.file)
+    if (!found) {
+      set.status = 404
+      return { error: 'not-found' satisfies SessionError }
+    }
+    return new Response(found.bytes, {
+      headers: {
+        'content-type': found.type,
+        'x-content-type-options': 'nosniff',
+        'cache-control': 'public, max-age=31536000, immutable',
+      },
+    })
+  })
+  .post(
+    '/emojis',
+    async ({ headers, request, set }) => {
+      const who = await caller(headers)
+      if ('error' in who) {
+        set.status = who.status
+        return { error: who.error }
+      }
+      if (overLimit(`emoji:${who.identity}`, 10, 60_000)) {
+        set.status = 429
+        return { error: 'slow-down' satisfies SessionError }
+      }
+      if (Number(headers['content-length'] ?? 0) > CUSTOM_EMOJI_MAX_BYTES) {
+        set.status = 413
+        return { error: 'too-large' satisfies SessionError }
+      }
+      const bytes = new Uint8Array(await request.arrayBuffer())
+      const result = addEmoji(headers['x-emoji-name'] ?? '', bytes, who.name)
+      if (typeof result === 'string') {
+        set.status = result === 'too-large' ? 413 : result === 'name-taken' ? 409 : 400
+        return { error: result }
+      }
+      await broadcast({ type: 'emojis', emojis: listEmojis() })
+      return result
+    },
+    { parse: 'none' },
+  )
+  .delete('/emojis/:name', async ({ headers, params, set }) => {
+    const who = await caller(headers)
+    if ('error' in who) {
+      set.status = who.status
+      return { error: who.error }
+    }
+    const role = roleOf(who.identity)
+    const result = removeEmoji(params.name, who.name, role === 'owner' || role === 'admin')
+    if (result !== true) {
+      set.status = result === 'not-found' ? 404 : 403
+      return { error: result }
+    }
+    await broadcast({ type: 'emojis', emojis: listEmojis() })
+    return { ok: true }
+  })
+  // Busca de GIFs (a chave do provedor fica só no servidor).
+  .get('/gifs/status', async ({ headers, set }) => {
+    const who = await caller(headers)
+    if ('error' in who) {
+      set.status = who.status
+      return { error: who.error }
+    }
+    return gifStatus()
+  })
+  .get(
+    '/gifs/search',
+    async ({ headers, query, set }) => {
+      const who = await caller(headers)
+      if ('error' in who) {
+        set.status = who.status
+        return { error: who.error }
+      }
+      if (overLimit(`gifs:${who.identity}`, 40, 60_000)) {
+        set.status = 429
+        return { error: 'slow-down' satisfies SessionError }
+      }
+      const page = Math.min(20, Math.max(1, Number(query.page) || 1))
+      const result = await searchGifs(query.q ?? '', page, query.locale ?? 'pt-BR')
+      if (!result.ok) {
+        set.status = result.error === 'not-configured' ? 404 : 502
+        return { error: result.error }
+      }
+      return result
+    },
+    {
+      query: t.Object({
+        q: t.Optional(t.String({ maxLength: 80 })),
+        page: t.Optional(t.String({ maxLength: 3 })),
+        locale: t.Optional(t.String({ maxLength: 10 })),
+      }),
+    },
+  )
+  // Chave dos GIFs: só o app de quem hospeda (mesmo PC + chave do app).
+  .post(
+    '/gifs/config',
+    ({ body, headers, request, server, set }) => {
+      if (!isHostRequest(server?.requestIP(request)?.address, headers)) {
+        set.status = 403
+        return { error: 'forbidden' satisfies SessionError }
+      }
+      setGifConfig(body.config)
+      return gifStatus()
+    },
+    {
+      body: t.Object({
+        config: t.Union([
+          t.Object({
+            provider: t.Union([t.Literal('klipy'), t.Literal('giphy')]),
+            key: t.String({ maxLength: 200 }),
+          }),
+          t.Null(),
+        ]),
       }),
     },
   )

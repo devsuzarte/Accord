@@ -17,7 +17,7 @@
     },
     "apps/api": {
       "name": "@sharescreen/api",
-      "version": "0.1.1",
+      "version": "0.7.0",
       "dependencies": {
         "@elysiajs/cors": "1.4.2",
         "@sharescreen/shared": "workspace:*",
@@ -33,9 +33,9 @@
     },
     "apps/desktop": {
       "name": "@sharescreen/desktop",
-      "version": "0.1.1",
+      "version": "0.7.0",
       "dependencies": {
-        "electron-updater": "^6.8.11",
+        "electron-updater": "6.8.11",
         "koffi": "3.3.6",
         "loopback-capture": "4.0.0",
       },
@@ -51,6 +51,7 @@
         "electron": "45.2.2",
         "electron-builder": "26.18.0",
         "electron-vite": "6.0.0",
+        "emojibase-data": "18.0.0",
         "gifenc": "1.0.3",
         "livekit-client": "2.23.0",
         "lucide-react": "1.67.0",
@@ -599,6 +600,10 @@
     "elysia": ["elysia@1.4.30", "", { "dependencies": { "cookie": "^1.1.1", "exact-mirror": "^0.2.7", "fast-decode-uri-component": "^1.0.1", "memoirist": "^0.4.0" }, "peerDependencies": { "@sinclair/typebox": ">= 0.34.0 < 1", "@types/bun": ">= 1.2.0", "file-type": ">= 20.0.0", "openapi-types": ">= 12.0.0", "typescript": ">= 5.0.0" }, "optionalPeers": ["@types/bun", "typescript"] }, "sha512-S2qqV0CbM4faB1hQQ5IYoeYnAUinjHlzRduxaBc4OoNqh0GjOc8k6tt3hv5ozWcG6Svr6hugw6JL4zNke4jwfA=="],
 
     "emoji-regex": ["emoji-regex@8.0.0", "", {}, "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A=="],
+
+    "emojibase": ["emojibase@18.0.0", "", {}, "sha512-5PG+EEt5zQ9qvqdHZw61+T9iz96g+r621QS/w8jEzPg+3mjzAdjl8LPLc+e9ABv/yboNfMwEair7aK9qKnwAbQ=="],
+
+    "emojibase-data": ["emojibase-data@18.0.0", "", { "peerDependencies": { "emojibase": "*" } }, "sha512-TPPRRYv2zPd0jKI+pTpMquwWNZXYAsC3IVsCMeg2X8y8fEzKwOks4/5bz0YavF5r6d71aGPpb6oDnUEwSLLMoA=="],
 
     "end-of-stream": ["end-of-stream@1.4.5", "", { "dependencies": { "once": "^1.4.0" } }, "sha512-ooEGc6HP26xXq/N+GCGOT0JKCLDGrq2bQUZrQ7gyrJiZANJ/8YDTxTpQBXGMn+WbIQXNVpyWymm7KYVICQnyOg=="],
 
