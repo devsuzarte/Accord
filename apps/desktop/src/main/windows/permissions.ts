@@ -19,12 +19,21 @@ function isAppUrl(url: string): boolean {
   return url.startsWith('file://') || (!!devUrl && url.startsWith(devUrl))
 }
 
+/**
+ * O player de música tem um iframe do YouTube dentro de uma página do app: quem pede é o
+ * frame (requestingUrl/requestingOrigin), não a página. Um iframe de fora nunca ganha nada.
+ */
 export function restrictPermissions(): void {
   const ses = session.defaultSession
-  ses.setPermissionRequestHandler((webContents, permission, callback) => {
-    callback(isAppUrl(webContents.getURL()) && ALLOWED.has(permission))
+  ses.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    const asker = details.requestingUrl || webContents.getURL()
+    callback(isAppUrl(asker) && isAppUrl(webContents.getURL()) && ALLOWED.has(permission))
   })
-  ses.setPermissionCheckHandler((webContents, permission) => {
+  ses.setPermissionCheckHandler((webContents, permission, requestingOrigin) => {
+    if (requestingOrigin && /^https?:\/\//.test(requestingOrigin)) {
+      const devUrl = process.env.ELECTRON_RENDERER_URL
+      if (!devUrl || !devUrl.startsWith(requestingOrigin)) return false
+    }
     if (!webContents) return ALLOWED.has(permission)
     return isAppUrl(webContents.getURL()) && ALLOWED.has(permission)
   })

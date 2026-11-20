@@ -5,6 +5,8 @@ import type {
   AppInfo,
   ChatMessage,
   ChatState,
+  ChatView,
+  MusicView,
   SessionMirrorRequest,
   CallCommand,
   CallSnapshot,
@@ -36,6 +38,7 @@ import {
   getCaptureProtection,
   setCaptureProtection,
 } from './windows/content-protection'
+import type { MusicPlayerWindow } from './music/player-window'
 
 const corners: OverlayCorner[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
 const tabs: PanelTab[] = ['channels', 'overlay', 'you', 'appearance']
@@ -217,6 +220,7 @@ export interface IpcDependencies {
   chat: ChatWindow
   mirror: SessionMirror
   invites: InviteService
+  music: MusicPlayerWindow
 }
 
 const moderationActions = [
@@ -245,6 +249,7 @@ export function registerIpcHandlers({
   chat,
   mirror,
   invites,
+  music,
 }: IpcDependencies): { retryPill: () => void } {
   type Sender = Pick<IpcMainEvent, 'sender'>
   const fromPill = (event: Sender) => overlay.isPill(event.sender.id)
@@ -348,19 +353,29 @@ export function registerIpcHandlers({
     lastCall = snapshot
     overlay.sendToPanel(IpcChannel.CallStateChanged, snapshot)
     people.send(IpcChannel.CallStateChanged, snapshot)
-    // Saiu da chamada: a lista de pessoas e as transmissões abertas fecham juntas.
+    chat.reportCall(snapshot)
+    viewers.reportCall(snapshot)
+    // Saiu da chamada: a lista de pessoas, o player e as transmissões abertas fecham juntos.
     if (snapshot.status === 'idle') {
       people.hide()
       viewers.closeAll()
+      music.close()
     }
   }
   // Se o pill travar, o main recarrega e entra de novo no canal (docs/16 P1).
   const recovery = new CallRecovery(overlay, share, () => lastCall, publishCall)
   ipcMain.on(IpcChannel.CallCommand, (event, command: unknown) => {
-    if ((fromPanel(event) || people.is(event.sender.id)) && isCallCommand(command)) {
-      recovery.noteCommand(command)
-      overlay.sendToPill(IpcChannel.CallCommand, command)
-    }
+    if (!isCallCommand(command)) return
+    const id = event.sender.id
+    // Janelas de assistir só pedem para abrir a transmissão de outra pessoa (a faixa de baixo).
+    const allowed =
+      fromPanel(event) ||
+      people.is(id) ||
+      chat.isFull(id) ||
+      (command.type === 'watch' && viewers.isViewer(id))
+    if (!allowed) return
+    recovery.noteCommand(command)
+    overlay.sendToPill(IpcChannel.CallCommand, command)
   })
   ipcMain.on(IpcChannel.CallReport, (event, snapshot: CallSnapshot) => {
     if (!fromPill(event)) return
@@ -464,12 +479,51 @@ export function registerIpcHandlers({
   ipcMain.on(IpcChannel.ChatToggle, (event) => {
     if (fromPill(event) || fromPanel(event) || people.is(event.sender.id)) chat.toggle()
   })
+  ipcMain.on(IpcChannel.ChatOpen, (_event, view: unknown) => {
+    chat.open(view === 'music' || view === 'chat' ? (view as ChatView) : undefined)
+  })
+
+  // Sala de música: o estado vem do pill; o player é uma janela própria.
+  ipcMain.on(IpcChannel.MusicReport, (event, view: unknown) => {
+    const v = view as MusicView
+    if (!fromPill(event) || typeof v !== 'object' || v === null || !('state' in v)) return
+    music.report(v)
+    chat.reportMusic(v)
+  })
+  ipcMain.handle(IpcChannel.MusicGetState, () => music.getView())
+  ipcMain.handle(IpcChannel.MusicPlayerGet, () => music.isOpen())
+  ipcMain.on(IpcChannel.MusicOpenPlayer, (event) => {
+    if (fromPill(event) || chat.isFull(event.sender.id)) music.open()
+  })
+  ipcMain.on(IpcChannel.MusicClosePlayer, (event) => {
+    if (music.is(event.sender.id) || chat.isFull(event.sender.id)) music.close()
+  })
+
+  // Sons do app: o pill toca, o painel ajusta.
+  ipcMain.handle(IpcChannel.SoundsGet, () => settings.getSounds())
+  ipcMain.on(IpcChannel.SoundsSet, (event, value: unknown) => {
+    if (fromPanel(event)) settings.setSounds(value)
+  })
+
+  // Chave da busca de GIFs (só o painel; vai para o servidor aberto por este app).
+  ipcMain.handle(IpcChannel.GifsGetSettings, (event) =>
+    fromPanel(event) ? settings.getGifs() : null,
+  )
+  ipcMain.handle(IpcChannel.GifsSetSettings, async (event, value: unknown) => {
+    if (!fromPanel(event)) return false
+    const saved = settings.setGifs(value)
+    return host.applyGifs(saved)
+  })
   ipcMain.on(IpcChannel.ChatSetMode, (event, mode: unknown) => {
     if (mode === 'expanded' || mode === 'mini') chat.setMode(mode)
   })
   ipcMain.on(IpcChannel.ChatResize, (event, size: unknown) => {
-    if (chat.is(event.sender.id) && isSize(size)) chat.resizeMini(size)
+    if (chat.isMini(event.sender.id) && isSize(size)) chat.resizeMini(size)
   })
+  ipcMain.handle(IpcChannel.ChatGetMode, (event) =>
+    chat.isFull(event.sender.id) ? 'expanded' : 'mini',
+  )
+  ipcMain.handle(IpcChannel.ChatGetView, () => chat.getView())
   ipcMain.handle(IpcChannel.ChatGetPrefs, () => chat.getPrefs())
   ipcMain.on(IpcChannel.ChatSetPrefs, (event, prefs: unknown) => {
     const v = prefs as { overlay?: unknown }

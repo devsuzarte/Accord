@@ -19,8 +19,6 @@ import {
   Check,
   ChevronDown,
   Copy,
-  Eye,
-  EyeOff,
   KeyRound,
   Link2,
   Lock,
@@ -43,6 +41,8 @@ import { channelLabel, useT } from '../shared/i18n'
 import { readJson, readString, write } from '../shared/storage'
 import { AudioSettings } from './AudioSettings'
 import { CameraSection } from './CameraSettings'
+import { GifSettings } from './GifSettings'
+import { PasswordInput } from './PasswordInput'
 import { InviteCard, useInvite } from './InviteCard'
 import { BandwidthTable, FirewallRow, NetworkTest, ShareHealth } from './StreamHealth'
 import { CopyInviteButton } from '../shared/CopyInviteButton'
@@ -215,48 +215,6 @@ function join(profile: Profile, serverUrl: string, password: string | null = nul
   write(LAST_SERVER_KEY, serverUrl)
   if (password !== null) rememberPassword(serverUrl, password)
   window.platform.call.command({ type: 'join', name: profile.name, serverUrl, password })
-}
-
-/** Campo de senha com o botão de mostrar/esconder. */
-function PasswordInput({
-  value,
-  onChange,
-  placeholder,
-  autoFocus,
-}: {
-  value: string
-  onChange(value: string): void
-  placeholder: string
-  autoFocus?: boolean
-}) {
-  const t = useT()
-  const [visible, setVisible] = useState(false)
-  return (
-    <span className="password">
-      <KeyRound size={15} className="password__icon" aria-hidden />
-      <input
-        className="field__input password__input"
-        type={visible ? 'text' : 'password'}
-        value={value}
-        maxLength={64}
-        placeholder={placeholder}
-        aria-label={placeholder}
-        autoFocus={autoFocus}
-        spellCheck={false}
-        autoComplete="off"
-        onChange={(e) => onChange(e.target.value)}
-      />
-      <button
-        type="button"
-        className="icon-button password__toggle"
-        aria-label={visible ? t('common.hide') : t('common.show')}
-        title={visible ? t('common.hide') : t('common.show')}
-        onClick={() => setVisible((v) => !v)}
-      >
-        {visible ? <EyeOff size={15} /> : <Eye size={15} />}
-      </button>
-    </span>
-  )
 }
 
 function JoinList({
@@ -653,6 +611,7 @@ function HostSection({ call, profile, onEditProfile }: ChannelsTabProps) {
           <FirewallRow host={host} />
         )}
         <BandwidthTable />
+        <GifSettings />
       </>
     )
   }
@@ -701,6 +660,7 @@ function HostSection({ call, profile, onEditProfile }: ChannelsTabProps) {
 
       {host.status === 'running' && <FirewallRow host={host} />}
       <BandwidthTable />
+      {host.status === 'running' && <GifSettings />}
 
       {!profile.name && <NeedName onEditProfile={onEditProfile} />}
       {!inCall && (

@@ -16,6 +16,7 @@ package also ship the following third-party software, each under its own license
 | [gifenc](https://github.com/mattdesl/gifenc) | 1.0.3 | MIT | GIF crop |
 | [React](https://react.dev), [Zustand](https://github.com/pmndrs/zustand), [Elysia](https://elysiajs.com) | 19.3.1, 5.0.16, 1.4.30 | MIT | app, server |
 | [Lucide](https://lucide.dev) icons | 1.67.0 | ISC | app |
+| [emojibase-data](https://emojibase.dev) (emoji names and keywords, PT-BR and EN) | 18.0.0 | MIT | chat emoji picker |
 | [Figtree](https://github.com/erikdkennedy/figtree) font | 5.3.0 | SIL OFL 1.1 | app |
 
 Apache-2.0 requires redistributing its license text with the binary: see

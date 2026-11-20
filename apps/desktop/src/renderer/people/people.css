@@ -364,3 +364,12 @@
 .people__invite + .people__close {
   margin-left: 0;
 }
+
+/* Quem transmite: a linha inteira abre a transmissão. */
+.person[data-watchable] {
+  cursor: pointer;
+}
+
+.person[data-watchable]:hover .live--watch {
+  background: color-mix(in srgb, var(--status-red) 85%, white);
+}

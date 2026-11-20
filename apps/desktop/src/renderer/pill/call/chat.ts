@@ -1,13 +1,27 @@
 import { CHAT_TOPIC, PASSWORD_HEADER } from '@sharescreen/shared'
-import type { ChatEvent, ChatMessage, ChatState } from '@sharescreen/shared'
+import type { ChatEvent, ChatMessage, ChatState, CustomEmoji, GifStatus } from '@sharescreen/shared'
 
 /**
  * Chat temporário do canal, do lado do pill (que é dono da conexão). As mensagens chegam
  * do servidor pelos dados do LiveKit (tópico CHAT_TOPIC) e o histórico vem de GET /chat/messages.
  * A janela de chat recebe tudo isto pelo main e envia mensagens direto ao servidor.
  */
-let state: ChatState = { messages: [], access: null, channelName: null, identity: null }
+const empty: ChatState = {
+  messages: [],
+  access: null,
+  channelName: null,
+  identity: null,
+  emojis: [],
+  gifs: { provider: null },
+}
+let state: ChatState = empty
 const listeners = new Set<() => void>()
+/** Alguém reagiu a uma mensagem sua (o pill toca um som). */
+let onReactionToMe: (() => void) | null = null
+
+export function setReactionListener(listener: (() => void) | null): void {
+  onReactionToMe = listener
+}
 
 function publish(): void {
   window.platform.chat.report(state)
@@ -40,10 +54,40 @@ export async function startChat(
 ): Promise<void> {
   state = { ...state, access: { serverUrl, token, password }, identity, channelName }
   publish()
-  await refreshHistory()
+  await Promise.all([refreshHistory(), refreshExtras()])
+}
+
+/** Emojis do servidor e se a busca de GIFs está ligada. */
+async function refreshExtras(): Promise<void> {
+  const access = state.access
+  if (!access) return
+  const headers = headersFor(access.token, access.password)
+  const get = async <T>(path: string): Promise<T | null> => {
+    try {
+      const response = await fetch(`${access.serverUrl}${path}`, {
+        headers,
+        signal: AbortSignal.timeout(8000),
+      })
+      return response.ok ? ((await response.json()) as T) : null
+    } catch {
+      return null
+    }
+  }
+  const [emojis, gifs] = await Promise.all([
+    get<CustomEmoji[]>('/emojis'),
+    get<GifStatus>('/gifs/status'),
+  ])
+  if (state.access !== access) return
+  state = {
+    ...state,
+    emojis: Array.isArray(emojis) ? emojis : state.emojis,
+    gifs: gifs && 'provider' in gifs ? gifs : { provider: null },
+  }
+  publish()
 }
 
 export async function refreshHistory(): Promise<void> {
+  void refreshExtras()
   const access = state.access
   if (!access) return
   try {
@@ -83,14 +127,39 @@ export function handleChatData(
   try {
     const event = JSON.parse(new TextDecoder().decode(payload)) as ChatEvent
     if (event.type === 'message' && event.message?.id) merge([event.message])
+    if (event.type === 'reactions' && typeof event.id === 'string') {
+      applyReactions(event.id, event.reactions ?? {})
+    }
+    if (event.type === 'emojis' && Array.isArray(event.emojis)) {
+      state = { ...state, emojis: event.emojis }
+      publish()
+    }
   } catch {
     /* ignora */
   }
 }
 
+function applyReactions(id: string, reactions: Record<string, string[]>): void {
+  const target = state.messages.find((m) => m.id === id)
+  if (!target) return
+  const me = state.identity
+  if (me && target.identity === me) {
+    const before = new Set(Object.values(target.reactions ?? {}).flat())
+    const added = Object.values(reactions)
+      .flat()
+      .some((who) => who !== me && !before.has(who))
+    if (added) onReactionToMe?.()
+  }
+  state = {
+    ...state,
+    messages: state.messages.map((m) => (m.id === id ? { ...m, reactions } : m)),
+  }
+  publish()
+}
+
 /** Saiu de vez: o chat some (é temporário). */
 export function endChat(): void {
-  state = { messages: [], access: null, channelName: null, identity: null }
+  state = empty
   publish()
 }
 

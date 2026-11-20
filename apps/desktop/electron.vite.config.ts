@@ -31,6 +31,7 @@ export default defineConfig({
           chat: resolve(__dirname, 'src/renderer/chat/index.html'),
           pointer: resolve(__dirname, 'src/renderer/pointer/index.html'),
           viewer: resolve(__dirname, 'src/renderer/viewer/index.html'),
+          music: resolve(__dirname, 'src/renderer/music/index.html'),
         },
       },
     },

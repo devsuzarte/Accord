@@ -12,11 +12,19 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import type {
   ChatAttachment,
+  ChatGif,
   ChatMessage,
+  ChatReply,
   SessionError,
   SessionSnapshot,
 } from '@sharescreen/shared'
-import { CHAT_MAX_FILE_BYTES, INVITE_PREFIX, isBlockedFile } from '@sharescreen/shared'
+import {
+  CHAT_MAX_FILE_BYTES,
+  CHAT_MAX_REACTIONS,
+  CUSTOM_EMOJI_NAME,
+  INVITE_PREFIX,
+  isBlockedFile,
+} from '@sharescreen/shared'
 import { env } from '../env'
 import { exportBlocks, importBlocks } from './roles'
 
@@ -166,6 +174,7 @@ export function addMessage(
   author: { identity: string; name: string; avatar: string | null },
   text: string,
   attachmentIds: string[],
+  extra: { replyTo?: string | null; gif?: ChatGif | null } = {},
 ): ChatMessage | SessionError {
   const attachments: ChatAttachment[] = []
   for (const id of attachmentIds) {
@@ -174,13 +183,23 @@ export function addMessage(
     attachments.push(publicAttachment(entry))
   }
   const clean = text.trim()
-  if (!clean && attachments.length === 0) return 'bad-message'
+  const gif = extra.gif ?? null
+  if (!clean && attachments.length === 0 && !gif) return 'bad-message'
+  let replyTo: ChatReply | null = null
+  if (extra.replyTo) {
+    const target = messages.find((m) => m.id === extra.replyTo)
+    // A mensagem respondida já saiu do histórico: manda sem a citação.
+    if (target) replyTo = { id: target.id, name: target.name, text: target.text.slice(0, 160) }
+  }
   const message: ChatMessage = {
     id: randomBytes(9).toString('base64url'),
     at: Date.now(),
     ...author,
     text: clean,
     attachments,
+    reactions: {},
+    replyTo,
+    gif,
   }
   messages.push(message)
   if (messages.length > MAX_MESSAGES) messages.splice(0, messages.length - MAX_MESSAGES)
@@ -189,6 +208,40 @@ export function addMessage(
 
 export function history(): ChatMessage[] {
   return messages
+}
+
+/**
+ * Reação válida: um emoji de verdade (começa com pictograma, bandeira ou tecla) ou o nome de um
+ * emoji do servidor (`:nome:`). Nada de texto livre: as reações aparecem para todos.
+ */
+export function isReactionKey(key: string): boolean {
+  if (key.length === 0 || key.length > 34 || /[\s<>]/.test(key)) return false
+  const custom = /^:([a-z0-9_]{2,32}):$/.exec(key)
+  if (custom) return CUSTOM_EMOJI_NAME.test(custom[1]!)
+  return /^(?:\p{Extended_Pictographic}|\p{Regional_Indicator}|[#*0-9]\uFE0F?\u20E3)/u.test(key)
+}
+
+/** Liga/desliga a sua reação. Devolve as reações novas da mensagem. */
+export function toggleReaction(
+  messageId: string,
+  key: string,
+  identity: string,
+): Record<string, string[]> | SessionError {
+  const message = messages.find((m) => m.id === messageId)
+  if (!message) return 'not-found'
+  if (!isReactionKey(key)) return 'bad-message'
+  const reactions = { ...(message.reactions ?? {}) }
+  const list = reactions[key] ?? []
+  if (list.includes(identity)) {
+    const rest = list.filter((who) => who !== identity)
+    if (rest.length) reactions[key] = rest
+    else delete reactions[key]
+  } else {
+    if (!reactions[key] && Object.keys(reactions).length >= CHAT_MAX_REACTIONS) return 'bad-message'
+    reactions[key] = [...list, identity]
+  }
+  message.reactions = reactions
+  return reactions
 }
 
 // ───────────────────────── Cópia para a migração ─────────────────────────

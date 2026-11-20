@@ -2,16 +2,22 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, BrowserWindow } from 'electron'
 import {
+  DEFAULT_SOUND_SETTINGS,
   DEFAULT_THEME,
+  SOUND_MAX_BYTES,
+  SOUND_NAMES,
   isLanguageSetting,
   MAX_BACKGROUND_OPACITY,
   MAX_IMAGE_BYTES,
   resolveLocale,
 } from '@sharescreen/shared'
 import type {
+  GifSettings,
   LanguageSetting,
   LanguageState,
   Profile,
+  SoundName,
+  SoundSettings,
   Theme,
   ThemeColors,
 } from '@sharescreen/shared'
@@ -67,8 +73,13 @@ export class SettingsStore {
     const saved = load<{ language: unknown }>('settings.json', { language: 'system' }).language
     return isLanguageSetting(saved) ? saved : 'system'
   })()
+  private sounds: SoundSettings = cleanSounds(load<unknown>('sounds.json', DEFAULT_SOUND_SETTINGS))
+  /** Chave da busca de GIFs (só de quem hospeda; vai para o servidor aberto por este app). */
+  private gifs: GifSettings | null = cleanGifs(load<unknown>('gifs.json', {}))
   /** Avisado quando o idioma muda (a bandeja se refaz). */
   onLanguageChange: (() => void) | null = null
+  /** Avisado quando as cores mudam (a barra da janela de chat acompanha). */
+  onThemeChange: ((theme: Theme) => void) | null = null
 
   constructor() {
     setMainLocale(this.getLanguage().locale)
@@ -128,5 +139,62 @@ export class SettingsStore {
     }
     save('theme.json', this.theme)
     broadcast(IpcChannel.ThemeChanged, this.theme)
+    this.onThemeChange?.(this.theme)
   }
+
+  getSounds(): SoundSettings {
+    return this.sounds
+  }
+
+  setSounds(input: unknown): void {
+    this.sounds = cleanSounds(input, this.sounds)
+    save('sounds.json', this.sounds)
+    broadcast(IpcChannel.SoundsChanged, this.sounds)
+  }
+
+  getGifs(): GifSettings | null {
+    return this.gifs
+  }
+
+  setGifs(input: unknown): GifSettings | null {
+    this.gifs = input === null ? null : cleanGifs(input)
+    save('gifs.json', this.gifs ?? {})
+    return this.gifs
+  }
+}
+
+const packs = ['accord', 'soft', 'arcade']
+
+/** Confere tudo o que vem do painel (e do arquivo, que alguém pode ter editado). */
+function cleanSounds(input: unknown, base: SoundSettings = DEFAULT_SOUND_SETTINGS): SoundSettings {
+  const v = (typeof input === 'object' && input !== null ? input : {}) as Partial<SoundSettings>
+  const names = SOUND_NAMES as readonly string[]
+  const volume = Number(v.volume)
+  const custom: Partial<Record<SoundName, string>> = {}
+  const source = typeof v.custom === 'object' && v.custom !== null ? v.custom : base.custom
+  for (const [name, data] of Object.entries(source)) {
+    if (
+      names.includes(name) &&
+      typeof data === 'string' &&
+      /^data:audio\/(mpeg|mp3|ogg|wav|x-wav|wave|webm|aac|mp4|x-m4a|flac);base64,/.test(data) &&
+      data.length <= SOUND_MAX_BYTES * 1.4
+    ) {
+      custom[name as SoundName] = data
+    }
+  }
+  return {
+    pack: packs.includes(v.pack as string) ? (v.pack as SoundSettings['pack']) : base.pack,
+    volume: Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : base.volume,
+    muted: Array.isArray(v.muted)
+      ? (v.muted.filter((n) => names.includes(n as string)) as SoundName[])
+      : base.muted,
+    custom,
+  }
+}
+
+function cleanGifs(input: unknown): GifSettings | null {
+  const v = input as Partial<GifSettings> | null
+  if (!v || (v.provider !== 'klipy' && v.provider !== 'giphy')) return null
+  const key = typeof v.key === 'string' ? v.key.trim().slice(0, 200) : ''
+  return key && /^[\w.-]+$/.test(key) ? { provider: v.provider, key } : null
 }

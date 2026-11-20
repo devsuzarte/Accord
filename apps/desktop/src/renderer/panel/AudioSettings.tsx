@@ -1,6 +1,7 @@
 import type { AudioState } from '@sharescreen/shared'
 import { AudioLines, Bell, Mic, Volume2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { SoundSettings } from './SoundSettings'
 import { useT } from '../shared/i18n'
 import { playTestSound, useAudioDevices, useMicLevel } from './useAudioDevices'
 
@@ -132,6 +133,7 @@ export function AudioSettings({ audio }: { audio: AudioState }) {
           }
         />
       </div>
+      <SoundSettings enabled={audio.sounds} />
     </div>
   )
 }

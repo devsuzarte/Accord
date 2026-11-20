@@ -5,6 +5,7 @@ import type {
   AppInfo,
   CaptureProtection,
   ChatMode,
+  ChatView,
   ChatPrefs,
   HotkeyInfo,
   VoiceHotkeys,
@@ -35,6 +36,9 @@ import type {
   MiniViewerState,
   HostStopMode,
   PointerPing,
+  MusicView,
+  SoundSettings,
+  GifSettings,
 } from './types'
 
 type Unsubscribe = () => void
@@ -198,6 +202,36 @@ export interface PlatformBridge {
     onPrefs(listener: (prefs: ChatPrefs) => void): Unsubscribe
     /** Pill: mensagens que chegaram desde a última vez que o chat foi aberto. */
     onUnread(listener: (count: number) => void): Unsubscribe
+    /** Abre a janela de chat completa (na conversa ou na música). */
+    open(view?: ChatView): void
+    /** Janela de chat: pediram para mostrar outra área. */
+    onView(listener: (view: ChatView) => void): Unsubscribe
+    /** Esta janela é a completa ou a mínima? */
+    getMode(): Promise<ChatMode>
+    getView(): Promise<ChatView>
+  }
+  music: {
+    /** Pill: publica o estado da sala de música (vem do servidor). */
+    report(view: MusicView): void
+    getState(): Promise<MusicView>
+    onState(listener: (view: MusicView) => void): Unsubscribe
+    /** Abre o player (o vídeo precisa ficar visível: regra do YouTube). */
+    openPlayer(): void
+    closePlayer(): void
+    /** Se o player está aberto (a música só toca nele). */
+    onPlayer(listener: (open: boolean) => void): Unsubscribe
+    playerOpen(): Promise<boolean>
+  }
+  sounds: {
+    get(): Promise<SoundSettings>
+    /** Painel: salva. */
+    set(settings: SoundSettings): void
+    onChange(listener: (settings: SoundSettings) => void): Unsubscribe
+  }
+  gifs: {
+    /** Painel: chave da busca de GIFs do servidor aberto por este app. */
+    getSettings(): Promise<GifSettings | null>
+    setSettings(settings: GifSettings | null): Promise<boolean>
   }
   session: {
     /** Pill: guardar (ou parar de guardar) a cópia da sessão para a migração de host. */

@@ -159,7 +159,22 @@ function PersonRow({
       data-active={active || undefined}
       data-speaking={person.speaking || undefined}
       data-quiet={person.micMuted || person.deafened || person.localMicMuted || undefined}
+      data-watchable={(person.streaming && !person.isLocal) || undefined}
+      title={
+        person.streaming && !person.isLocal
+          ? t('people.watch', { name: person.displayName })
+          : undefined
+      }
       onContextMenu={onMenu}
+      // Quem está transmitindo: clicar em qualquer parte da linha já abre a transmissão.
+      onClick={() => {
+        if (person.streaming && !person.isLocal) send({ type: 'watch', identity: person.userId })
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' && person.streaming && !person.isLocal) {
+          send({ type: 'watch', identity: person.userId })
+        }
+      }}
       aria-haspopup="menu"
     >
       <Avatar

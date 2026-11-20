@@ -601,10 +601,65 @@ export interface ChatMessage {
   avatar: string | null
   text: string
   attachments: ChatAttachment[]
+  /** Reações: emoji (ou `:nome:` de um emoji do servidor) → identidades de quem reagiu. */
+  reactions?: Record<string, string[]>
+  /** Resposta a outra mensagem (um trecho, para mostrar em cima). */
+  replyTo?: ChatReply | null
+  /** GIF escolhido na busca de GIFs. */
+  gif?: ChatGif | null
 }
 
-/** Mensagem que o servidor manda pelo tópico CHAT_TOPIC. */
-export type ChatEvent = { type: 'message'; message: ChatMessage }
+export interface ChatReply {
+  id: string
+  name: string
+  /** Começo do texto (ou vazio, se era só anexo/GIF). */
+  text: string
+}
+
+/** Provedores de busca de GIFs (o host escolhe e põe a chave; a chave nunca sai do servidor). */
+export type GifProvider = 'klipy' | 'giphy'
+
+export interface ChatGif {
+  provider: GifProvider
+  id: string
+  /** GIF/WebP para mostrar na conversa. */
+  url: string
+  /** Versão pequena (lista de busca e modo mínimo). */
+  preview: string
+  width: number
+  height: number
+  title: string
+}
+
+/** Resultado da busca de GIFs (o servidor guarda por um tempo para conferir o que é enviado). */
+export type GifResult = ChatGif
+
+export interface GifStatus {
+  /** null = o host não configurou uma chave. */
+  provider: GifProvider | null
+}
+
+/** Emoji personalizado do servidor (fica guardado no PC de quem hospeda). */
+export interface CustomEmoji {
+  /** Só letras minúsculas, números e _ (usado como `:nome:`). */
+  name: string
+  /** Caminho no servidor (`/emojis/<arquivo>`). */
+  path: string
+  animated: boolean
+  /** Nome de quem enviou. */
+  by: string
+}
+
+export const CUSTOM_EMOJI_MAX = 120
+export const CUSTOM_EMOJI_MAX_BYTES = 512 * 1024
+export const CUSTOM_EMOJI_NAME = /^[a-z0-9_]{2,32}$/
+export const CHAT_MAX_REACTIONS = 20
+
+/** Mensagens que o servidor manda pelo tópico CHAT_TOPIC. */
+export type ChatEvent =
+  | { type: 'message'; message: ChatMessage }
+  | { type: 'reactions'; id: string; reactions: Record<string, string[]> }
+  | { type: 'emojis'; emojis: CustomEmoji[] }
 
 /**
  * Cópia da sessão que os próximos da fila guardam, para continuar se o host cair:
@@ -632,6 +687,10 @@ export interface ChatState {
   channelName: string | null
   /** Sua identidade (para destacar suas mensagens). */
   identity: string | null
+  /** Emojis personalizados do servidor. */
+  emojis: CustomEmoji[]
+  /** Busca de GIFs disponível neste servidor. */
+  gifs: GifStatus
 }
 
 /** Para onde a sessão vai se o host cair: ordem de chegada e endereços de cada um. */
@@ -641,4 +700,141 @@ export interface SessionMirrorRequest {
   password: string | null
   /** Baixar também os anexos (só os dois primeiros da fila). */
   files: boolean
+}
+
+// ───────────────────────── Música em grupo (YouTube) ─────────────────────────
+
+/** Estado da sala de música enviado pelo servidor (tópico MUSIC_TOPIC). */
+export const MUSIC_TOPIC = 'accord.music'
+export const MUSIC_MAX_QUEUE = 100
+
+export interface MusicItem {
+  id: string
+  /** Id do vídeo no YouTube (11 caracteres). */
+  videoId: string
+  title: string
+  author: string
+  thumbnail: string
+  addedBy: string
+  addedById: string
+  addedAt: number
+  /** Identidades de quem votou para tocar esta antes (a mais votada toca em seguida). */
+  votes: string[]
+}
+
+export interface MusicNow extends MusicItem {
+  /** Relógio do servidor (ms) em que a música estaria no segundo 0. */
+  startedAt: number
+  /** Pausada: relógio do servidor no momento da pausa. */
+  pausedAt: number | null
+  /** Duração em segundos (o primeiro player que carregar avisa). */
+  duration: number | null
+}
+
+/**
+ * open = todo mundo controla (tocar, pausar, pular por votação) ·
+ * dj = só o dono, os admins e quem pôs a música atual.
+ */
+export type MusicMode = 'open' | 'dj'
+
+export interface SpotifyJam {
+  url: string
+  by: string
+  at: number
+}
+
+export interface MusicState {
+  queue: MusicItem[]
+  current: MusicNow | null
+  /** Últimas que tocaram (mais recente primeiro). */
+  history: MusicItem[]
+  mode: MusicMode
+  /** Quem votou para pular a atual. */
+  skipVotes: string[]
+  /** Votos necessários para pular (metade das pessoas na call, arredondado para cima). */
+  skipNeeded: number
+  /** Link da Jam do Spotify que alguém compartilhou (abre no app do Spotify de cada um). */
+  jam: SpotifyJam | null
+  /** Relógio do servidor quando este estado saiu. */
+  serverNow: number
+}
+
+export type MusicControl =
+  | { action: 'play' }
+  | { action: 'pause' }
+  | { action: 'seek'; position: number }
+  | { action: 'skip' }
+
+export type MusicError =
+  | 'bad-link'
+  | 'not-embeddable'
+  | 'queue-full'
+  | 'forbidden'
+  | 'not-found'
+  | 'slow-down'
+  | 'invalid-session'
+
+/** O que o pill conta para o main, a janela de chat e o player. */
+export interface MusicView {
+  state: MusicState | null
+  access: ChatState['access']
+  identity: string | null
+}
+
+// ───────────────────────── Sons do app ─────────────────────────
+
+export const SOUND_NAMES = [
+  'mic-on',
+  'mic-off',
+  'deafen',
+  'undeafen',
+  'join',
+  'leave',
+  'user-join',
+  'user-leave',
+  'share-start',
+  'share-stop',
+  'stream-on',
+  'stream-off',
+  'message',
+  'message-sent',
+  'mention',
+  'reaction',
+  'music-queued',
+  'music-next',
+  'ptt-down',
+  'ptt-up',
+  'reconnecting',
+  'reconnected',
+  'error',
+] as const
+
+export type SoundName = (typeof SOUND_NAMES)[number]
+
+/** Pacotes de som (todos sintetizados na hora, nenhum arquivo de terceiros). */
+export type SoundPack = 'accord' | 'soft' | 'arcade'
+
+export interface SoundSettings {
+  pack: SoundPack
+  /** 0 a 1. */
+  volume: number
+  /** Ações sem som. */
+  muted: SoundName[]
+  /** Som próprio por ação (data URL de áudio, até SOUND_MAX_BYTES). */
+  custom: Partial<Record<SoundName, string>>
+}
+
+export const SOUND_MAX_BYTES = 400 * 1024
+
+export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
+  pack: 'accord',
+  volume: 0.7,
+  muted: ['ptt-down', 'ptt-up'],
+  custom: {},
+}
+
+/** Configuração da busca de GIFs de quem hospeda (guardada só neste PC). */
+export interface GifSettings {
+  provider: GifProvider
+  key: string
 }

@@ -42,6 +42,7 @@ import {
   handleChatData,
   onChatChange,
   refreshHistory,
+  setReactionListener,
   startChat,
   suspendChat,
 } from './chat'
@@ -59,8 +60,9 @@ import { startScreenShare } from './screenShare'
 import type { ActiveShare } from './screenShare'
 import { startShareMonitor } from './shareMonitor'
 import type { ShareMonitor } from './shareMonitor'
-import { playSound, setSoundsOutput } from './sounds'
-import type { SoundName } from './sounds'
+import { followSoundSettings, playSound, setSoundsOutput } from '../../shared/sounds'
+import { endMusic, handleMusicData, refreshMusic, setQueuedListener, startMusic } from './music'
+import type { SoundName } from '@sharescreen/shared'
 
 /**
  * Sessão da chamada. Vive no PILL porque ele fica aberto o tempo todo
@@ -515,6 +517,7 @@ export const useCallStore = create<CallStore>((set, get) => {
     if (reconnectCheck) clearTimeout(reconnectCheck)
     reconnectCheck = null
     endChat()
+    endMusic()
     lastMirror = ''
     window.platform.session.mirror(null)
     saveResume(null)
@@ -534,7 +537,10 @@ export const useCallStore = create<CallStore>((set, get) => {
   const wire = (r: Room) => {
     const onReconnecting = (media: boolean) => {
       log(media ? 'reconectando' : 'reconectando ao servidor')
-      if (media) set({ status: 'reconnecting' })
+      if (media) {
+        if (get().status !== 'reconnecting') sound('reconnecting')
+        set({ status: 'reconnecting' })
+      }
       // O host avisou que ia sair: nem tenta reconectar, já vai para o próximo.
       if (handoffPending) return void r.disconnect()
       // O LiveKit tenta reconectar por quase um minuto. Se a API do host também sumiu, não
@@ -570,10 +576,15 @@ export const useCallStore = create<CallStore>((set, get) => {
         RoomEvent.TrackPublished,
         (publication: RemoteTrackPublication, participant: RemoteParticipant) => {
           subscribeIfVoice(publication, participant)
+          // Alguém começou a transmitir (o selo AO VIVO aparece junto).
+          if (publication.source === Track.Source.ScreenShare) sound('stream-on')
           refresh()
         },
       )
-      .on(RoomEvent.TrackUnpublished, refresh)
+      .on(RoomEvent.TrackUnpublished, (publication: RemoteTrackPublication) => {
+        if (publication.source === Track.Source.ScreenShare) sound('stream-off')
+        refresh()
+      })
       .on(RoomEvent.LocalTrackPublished, (publication: LocalTrackPublication) => {
         if (publication.source === Track.Source.Microphone) {
           void applyNoise(get().audio.noiseSuppression)
@@ -645,7 +656,9 @@ export const useCallStore = create<CallStore>((set, get) => {
         if (reconnectCheck) clearTimeout(reconnectCheck)
         reconnectCheck = null
         log('reconectado')
+        if (get().status === 'reconnecting') sound('reconnected')
         void refreshHistory()
+        void refreshMusic()
         set({ status: 'connected', error: null })
         refresh()
       })
@@ -657,6 +670,7 @@ export const useCallStore = create<CallStore>((set, get) => {
           if (topic === SESSION_TOPIC) return handleSessionEvent(payload)
           if (topic === POINTER_TOPIC) return handlePointer(payload)
           if (topic === STREAM_REPORT_TOPIC) return handleStreamReport(payload)
+          if (handleMusicData(payload, topic)) return
           handleChatData(payload, false, topic)
         },
       )
@@ -730,16 +744,28 @@ export const useCallStore = create<CallStore>((set, get) => {
     shareMonitor?.report(report)
   }
 
-  // Mensagem nova de outra pessoa: um "tic" baixinho (só o histórico ao entrar não toca).
+  // Mensagem nova: um "tic" baixinho (só o histórico ao entrar não toca). Quem cita o seu
+  // nome com @ toca outro som; a sua própria mensagem chegando confirma o envio.
   let heard = 0
   onChatChange(() => {
     const list = chatMessages()
+    if (list.length < heard) heard = 0
     const fresh = list.slice(heard)
     heard = list.length
+    if (fresh.length === 0 || fresh.length > 3 || !get().audio.sounds) return
     const me = room?.localParticipant.identity
-    if (fresh.length > 0 && fresh.length <= 3 && fresh.some((m) => m.identity !== me)) {
-      if (get().audio.sounds) playSound('message', 0.09)
-    }
+    const mention = new RegExp(`(^|\\s)@${escapeRegExp(myName)}(?![\\p{L}\\p{N}_])`, 'iu')
+    const others = fresh.filter((m) => m.identity !== me)
+    if (others.some((m) => myName && (mention.test(m.text) || m.replyTo?.name === myName))) {
+      playSound('mention', 0.12)
+    } else if (others.length > 0) playSound('message', 0.09)
+    else playSound('message-sent', 0.07)
+  })
+  setReactionListener(() => {
+    if (get().audio.sounds) playSound('reaction', 0.08)
+  })
+  setQueuedListener(() => {
+    if (get().audio.sounds) playSound('music-queued', 0.08)
   })
 
   /** Entra num servidor (usado ao entrar e ao seguir o host novo na migração). */
@@ -808,6 +834,7 @@ export const useCallStore = create<CallStore>((set, get) => {
     const host = await window.platform.host.getState().catch(() => null)
     await updateMe({ addrs: host?.addresses.map((a) => a.address) ?? [] })
     await startChat(base, access.token, password, access.identity, access.channelName)
+    void startMusic(base, access.token, password, access.identity)
     refresh()
 
     // Entra respeitando o que a pessoa escolheu antes: mudo e/ou ensurdecido.
@@ -846,6 +873,7 @@ export const useCallStore = create<CallStore>((set, get) => {
     }
     dropRoom()
     suspendChat()
+    endMusic()
     migrating = true
     set({
       status: 'reconnecting',
@@ -1374,6 +1402,9 @@ function pushToTalk(down: boolean): void {
   if (pttTimer) clearTimeout(pttTimer)
   pttTimer = null
   const apply = (held: boolean) => {
+    if (held !== pttHeld && useCallStore.getState().audio.sounds) {
+      playSound(held ? 'ptt-down' : 'ptt-up', 0.06)
+    }
     pttHeld = held
     applyPushToTalk()
     useCallStore.setState({ pushToTalk: { held } })
@@ -1472,6 +1503,7 @@ export function startReportingCallState(): () => void {
   })
 
   setSoundsOutput(useCallStore.getState().audio.outputDeviceId)
+  const unsubscribeSounds = followSoundSettings()
 
   // Fonte escolhida no seletor de tela.
   const unsubscribeShare = window.platform.share.onStart((request) => {
@@ -1483,5 +1515,10 @@ export function startReportingCallState(): () => void {
     unsubscribeCommands()
     unsubscribeShare()
     unsubscribeProfile()
+    unsubscribeSounds()
   }
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

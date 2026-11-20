@@ -2,7 +2,15 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import { IpcChannel, SHARE_AUDIO_PORT_MESSAGE } from '@sharescreen/shared'
-import type { CaptureProtection, ChatMode, ChatPrefs, Invite } from '@sharescreen/shared'
+import type {
+  CaptureProtection,
+  ChatMode,
+  ChatPrefs,
+  ChatView,
+  Invite,
+  MusicView,
+  SoundSettings,
+} from '@sharescreen/shared'
 import type {
   CallCommand,
   CallSnapshot,
@@ -142,6 +150,28 @@ const platform: PlatformBridge = {
     setPrefs: (prefs) => ipcRenderer.send(IpcChannel.ChatSetPrefs, prefs),
     onPrefs: (listener) => subscribe<ChatPrefs>(IpcChannel.ChatPrefsChanged, listener),
     onUnread: (listener) => subscribe<number>(IpcChannel.ChatUnreadChanged, listener),
+    open: (view) => ipcRenderer.send(IpcChannel.ChatOpen, view),
+    onView: (listener) => subscribe<ChatView>(IpcChannel.ChatViewChanged, listener),
+    getMode: () => ipcRenderer.invoke(IpcChannel.ChatGetMode),
+    getView: () => ipcRenderer.invoke(IpcChannel.ChatGetView),
+  },
+  music: {
+    report: (view) => ipcRenderer.send(IpcChannel.MusicReport, view),
+    getState: () => ipcRenderer.invoke(IpcChannel.MusicGetState),
+    onState: (listener) => subscribe<MusicView>(IpcChannel.MusicStateChanged, listener),
+    openPlayer: () => ipcRenderer.send(IpcChannel.MusicOpenPlayer),
+    closePlayer: () => ipcRenderer.send(IpcChannel.MusicClosePlayer),
+    onPlayer: (listener) => subscribe<boolean>(IpcChannel.MusicPlayerChanged, listener),
+    playerOpen: () => ipcRenderer.invoke(IpcChannel.MusicPlayerGet),
+  },
+  sounds: {
+    get: () => ipcRenderer.invoke(IpcChannel.SoundsGet),
+    set: (settings) => ipcRenderer.send(IpcChannel.SoundsSet, settings),
+    onChange: (listener) => subscribe<SoundSettings>(IpcChannel.SoundsChanged, listener),
+  },
+  gifs: {
+    getSettings: () => ipcRenderer.invoke(IpcChannel.GifsGetSettings),
+    setSettings: (settings) => ipcRenderer.invoke(IpcChannel.GifsSetSettings, settings),
   },
   session: {
     mirror: (request) => ipcRenderer.send(IpcChannel.SessionMirror, request),

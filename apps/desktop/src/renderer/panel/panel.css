@@ -1656,3 +1656,140 @@ kbd[data-broken] {
   flex-shrink: 0;
   margin-top: 2px;
 }
+
+/* ── Sons do app ── */
+
+.sounds {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.sounds[data-disabled] {
+  opacity: 0.5;
+}
+
+.sounds__row {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.sounds__row input[type='range'] {
+  width: 100%;
+  accent-color: var(--brand);
+}
+
+.sounds__packs {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-floating);
+}
+
+.sounds__packs button {
+  flex: 1;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.sounds__packs [aria-checked='true'] {
+  background: var(--bg-modifier-selected);
+  color: var(--text-strong);
+}
+
+.sounds__list ul {
+  display: grid;
+  gap: 1px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sound {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 30px;
+  padding: 0 4px 0 8px;
+  border-radius: var(--radius-sm);
+}
+
+.sound:hover {
+  background: var(--bg-modifier-hover);
+}
+
+.sound[data-muted] .sound__name {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.sound__name {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+}
+
+.sound__tag {
+  padding: 0 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--brand) 25%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.sound__button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  color: var(--interactive);
+}
+
+.sound__button:hover:not(:disabled) {
+  background: var(--bg-modifier-selected);
+  color: var(--interactive-hover);
+}
+
+.sound__button:disabled {
+  opacity: 0.4;
+}
+
+/* ── GIFs (quem hospeda) ── */
+
+.gifs {
+  display: grid;
+  gap: 8px;
+}
+
+.gifs[open] {
+  padding-bottom: 4px;
+}
+
+.gifs__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: color-mix(in srgb, var(--brand) 70%, var(--text-strong));
+  text-decoration: none;
+}
+
+.gifs__link:hover {
+  text-decoration: underline;
+}
+
+.gifs__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
